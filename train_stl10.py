@@ -5,6 +5,7 @@ from tensorflow.python.keras import Model
 from tensorflow.python.keras.applications import vgg16, mobilenet_v2
 from tensorflow.python.keras.layers import Dense, BatchNormalization
 from tensorflow.python.keras.optimizers import SGD
+from tensorflow.python.keras.callbacks import EarlyStopping
 
 import numpy as np
 from stl10_data_loader import STL10Loader
@@ -26,11 +27,13 @@ def train_stl10(y_train, y_test, x_train, x_test, num_classes, epochs, batch_siz
 
     opt = SGD(lr=1e-3, momentum=0.9, decay=0, nesterov=False)
     model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['acc', 'mse'])
+    earlystopping = EarlyStopping(monitor='val_acc', patience=10, restore_best_weights=True)
     model.fit(x_train, y_train,
               batch_size=batch_size,
               epochs=epochs,
               validation_split=0.2,
-              shuffle=True)
+              shuffle=True,
+              callbacks=[earlystopping])
     scores = model.evaluate(x_test, y_test, verbose=1)
     print('Test loss:', scores[0])
     print('Test accuracy:', scores[1])

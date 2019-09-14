@@ -247,7 +247,7 @@ if __name__ == "__main__":
         [list(get_rejection_measures(pred_y, np.argmax(y_test, axis=1), np.argsort(voted_pred), rejection_point))
          for rejection_point in range(1, pred_y.shape[0] - 10)])
     with open(args.output_file, 'wb') as file:
-        pickle.dump((mu_entropy, voted_pred, sampling_entropy_gal, rejection_measures,
+        pickle.dump((mu_entropy, error, voted_pred, sampling_entropy_gal, rejection_measures,
                      rejection_measures_baseline, rejection_measures_voting,
                      x_test, y_test), file)
     logger.info("Done")

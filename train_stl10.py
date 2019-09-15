@@ -27,7 +27,7 @@ def train_stl10(y_train, y_test, x_train, x_test, num_classes, epochs, batch_siz
 
     opt = SGD(lr=1e-3, momentum=0.9, decay=0, nesterov=False)
     model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['acc', 'mse'])
-    earlystopping = EarlyStopping(monitor='val_acc', patience=10, restore_best_weights=True)
+    earlystopping = EarlyStopping(monitor='val_acc', patience=50, restore_best_weights=True)
     model.fit(x_train, y_train,
               batch_size=batch_size,
               epochs=epochs,

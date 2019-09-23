@@ -120,6 +120,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     input_dir = args.input_dir
     data_dir = os.path.sep.join([input_dir, 'data_256'])
+    output_file = os.path.sep.join([input_dir, args.output_file])
     logger.info('Load pretrained data')
     train_file = os.path.sep.join([input_dir, 'train_data.pkl'])
     test_file = os.path.sep.join([input_dir, 'test_data.pkl'])
@@ -169,7 +170,7 @@ if __name__ == "__main__":
     logger.info("Save the model")
     tf.keras.models.save_model(
         unc_model,
-        args.output_file+'unc_model',
+        output_file,
         overwrite=True,
         include_optimizer=True,
         save_format=None

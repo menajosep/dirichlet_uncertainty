@@ -12,7 +12,7 @@ HEIGHT, WIDTH, DEPTH = 96, 96, 3
 SIZE = HEIGHT * WIDTH * DEPTH
 
 # path to the directory with the data
-DATA_DIR = 'stl10_data'
+DATA_DIR = '/data/data2/jmena/STL-10'
 
 # url of the binary data
 DATA_URL = 'http://ai.stanford.edu/~acoates/stl10/stl10_binary.tar.gz'
@@ -153,3 +153,29 @@ class STL10Loader(object):
         y_test_cat = to_categorical(y_test_cifar10, self.num_classes)
 
         return (x_train, y_train, y_train_cifar10, y_train_cat), (x_test, y_test, y_test_cifar10, y_test_cat)
+
+    def load_raw_dataset(self):
+        # download the extract the dataset.
+        self.download_and_extract()
+
+        # load the train and test data and labels.
+        x_train = self.read_all_images(TRAIN_DATA_PATH)
+        y_train = self.read_labels(TRAIN_LABELS_PATH)
+        x_test = self.read_all_images(TEST_DATA_PATH)
+        y_test = self.read_labels(TEST_LABELS_PATH)
+
+        # convert all images to floats in the range [0, 1]
+        x_train = x_train.astype('float32')
+        x_train = (x_train - 10) / 255.0
+        x_test = x_test.astype('float32')
+        x_test = (x_test - 10) / 255.0
+
+        # convert the labels to be zero based.
+        y_train -= 1
+        y_test -= 1
+
+        # convert labels to hot-one vectors.
+        y_train_cat = to_categorical(y_train, self.num_classes)
+        y_test_cat = to_categorical(y_test, self.num_classes)
+
+        return (x_train, y_train, y_train_cat), (x_test, y_test, y_test_cat)

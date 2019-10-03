@@ -111,6 +111,8 @@ if __name__ == "__main__":
                         help='dir holding the data')
     parser.add_argument('--input_dir', type=str, default='/data/data2/jmena/STL-10',
                         help='dir holding the data')
+    parser.add_argument('--mode', type=str, default='categorical',
+                        help='prediction mode: categorical|probabilities')
     parser.add_argument('--output_file', type=str, default='stl10_output',
                         help='file to dump the generated data')
     parser.add_argument('--label_mapping_file', type=str, default='imagenet_stl10_mapping.pkl',
@@ -121,6 +123,10 @@ if __name__ == "__main__":
     num_classes = 10
     args = parser.parse_args()
     input_dir = args.input_dir
+    if args.mode == 'categorical':
+        test_file = 'test_preds.pkl'
+    elif args.mode == 'probabilities':
+        test_file = 'test_prob_preds.pkl'
     output_file = os.path.sep.join([input_dir, args.output_file])
 
     logger.info('Load mapping file')
@@ -129,12 +135,13 @@ if __name__ == "__main__":
 
     logger.error('Load pretrained data')
     logger.info('Load  test dataset')
-    with open(os.path.sep.join([input_dir, 'test_preds.pkl']), 'rb') as file:
+    with open(os.path.sep.join([input_dir, test_file]), 'rb') as file:
         test_mu_predictions = pickle.load(file)
-        test_pred_y = [
-            imagenet_stl10_mapping[label[0][1]] if imagenet_stl10_mapping[label[0][1]] is not None else random.randint(
-                0, 9) for label in decode_predictions(test_mu_predictions, top=1)]
-        test_mu_predictions = to_categorical(test_pred_y, num_classes)
+        if args.mode == 'categorical':
+            test_pred_y = [
+                imagenet_stl10_mapping[label[0][1]] if imagenet_stl10_mapping[label[0][1]] is not None else random.randint(
+                    0, 9) for label in decode_predictions(test_mu_predictions, top=1)]
+            test_mu_predictions = to_categorical(test_pred_y, num_classes)
 
     logger.error("Loading STL-10")
     stl10_data_loader = STL10Loader(num_classes)

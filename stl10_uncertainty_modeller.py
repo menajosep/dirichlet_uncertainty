@@ -189,6 +189,8 @@ if __name__ == "__main__":
                         help='file to dump the generated data')
     parser.add_argument('--input_dir', type=str, default='./',
                         help='dir to load the trained model')
+    parser.add_argument('--mode', type=str, default='categorical',
+                        help='prediction mode: categorical|probabilities')
     parser.add_argument('--label_mapping_file', type=str, default='imagenet_stl10_mapping.pkl',
                         help='label mapping file')
 
@@ -198,6 +200,12 @@ if __name__ == "__main__":
     learning_rate = args.learning_rate
     num_units = args.num_units
     epochs = args.epochs
+    if args.mode == 'categorical':
+        train_file = 'train_preds.pkl'
+        test_file = 'test_preds.pkl'
+    elif args.mode == 'probabilities':
+        train_file = 'train_prob_preds.pkl'
+        test_file = 'test_prob_preds.pkl'
     output_file = os.path.sep.join([input_dir, args.output_file])
     logger = get_logger()
     ssl._create_default_https_context = ssl._create_unverified_context
@@ -210,18 +218,20 @@ if __name__ == "__main__":
         imagenet_stl10_mapping = pickle.load(file)
 
     logger.info('Load  target dataset')
-    with open(os.path.sep.join([input_dir, 'train_preds.pkl']), 'rb') as file:
+    with open(os.path.sep.join([input_dir, train_file]), 'rb') as file:
         mu_predictions = pickle.load(file)
-        pred_y = [
-            imagenet_stl10_mapping[label[0][1]] if imagenet_stl10_mapping[label[0][1]] is not None else random.randint(
-                0, 9) for label in decode_predictions(mu_predictions, top=1)]
-        mu_predictions = to_categorical(pred_y, num_classes)
-    with open(os.path.sep.join([input_dir, 'test_preds.pkl']), 'rb') as file:
+        if args.mode == 'categorical':
+            pred_y = [
+                imagenet_stl10_mapping[label[0][1]] if imagenet_stl10_mapping[label[0][1]] is not None else random.randint(
+                    0, 9) for label in decode_predictions(mu_predictions, top=1)]
+            mu_predictions = to_categorical(pred_y, num_classes)
+    with open(os.path.sep.join([input_dir, test_file]), 'rb') as file:
         test_mu_predictions = pickle.load(file)
-        test_pred_y = [
-            imagenet_stl10_mapping[label[0][1]] if imagenet_stl10_mapping[label[0][1]] is not None else random.randint(
-                0, 9) for label in decode_predictions(test_mu_predictions, top=1)]
-        test_mu_predictions = to_categorical(test_pred_y, num_classes)
+        if args.mode == 'categorical':
+            test_pred_y = [
+                imagenet_stl10_mapping[label[0][1]] if imagenet_stl10_mapping[label[0][1]] is not None else random.randint(
+                    0, 9) for label in decode_predictions(test_mu_predictions, top=1)]
+            test_mu_predictions = to_categorical(test_pred_y, num_classes)
     logger.error("Loading STL-10")
     stl10_data_loader = STL10Loader(num_classes)
     (stl10_x_train, stl10_y_train, stl10_y_train_cat), (stl10_x_test, stl10_y_test, stl10_y_test_cat) = stl10_data_loader.load_raw_dataset()

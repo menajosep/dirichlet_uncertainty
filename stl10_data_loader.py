@@ -12,7 +12,8 @@ HEIGHT, WIDTH, DEPTH = 96, 96, 3
 SIZE = HEIGHT * WIDTH * DEPTH
 
 # path to the directory with the data
-DATA_DIR = '/data/data2/jmena/STL-10'
+#DATA_DIR = '/data/data2/jmena/STL-10'
+DATA_DIR = 'stl10_data'
 
 # url of the binary data
 DATA_URL = 'http://ai.stanford.edu/~acoates/stl10/stl10_binary.tar.gz'

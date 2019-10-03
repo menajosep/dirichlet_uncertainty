@@ -3,3 +3,5 @@ keras_*
 output.pkl
 *.iml
 .idea/
+*.pkl
+*.txt

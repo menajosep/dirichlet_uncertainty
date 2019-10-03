@@ -185,7 +185,7 @@ if __name__ == "__main__":
                         help='batch size')
     parser.add_argument('--save_dir', type=str, default='./',
                         help='dir to save the trained model')
-    parser.add_argument('--output_file', type=str, default='output.pkl',
+    parser.add_argument('--output_file', type=str, default='stl10_uncertainty_model',
                         help='file to dump the generated data')
     parser.add_argument('--input_dir', type=str, default='./',
                         help='dir to load the trained model')

@@ -263,7 +263,7 @@ if __name__ == "__main__":
 
     logger.info("Save the training history")
     with open(output_history_file, 'wb') as file:
-        pickle.dump(training_history, file)
+        pickle.dump(training_history.history, file)
     logger.info("Save the model")
     tf.keras.models.save_model(
         unc_model,

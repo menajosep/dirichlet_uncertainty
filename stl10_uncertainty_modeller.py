@@ -190,7 +190,7 @@ if __name__ == "__main__":
     parser.add_argument('--input_dir', type=str, default='./',
                         help='dir to load the trained model')
     parser.add_argument('--mode', type=str, default='categorical',
-                        help='prediction mode: categorical|probabilities')
+                        help='prediction mode: categorical|probabilities|prob_cat')
     parser.add_argument('--label_mapping_file', type=str, default='imagenet_stl10_mapping.pkl',
                         help='label mapping file')
 
@@ -206,6 +206,9 @@ if __name__ == "__main__":
     elif args.mode == 'probabilities':
         train_file = 'train_prob_preds.pkl'
         test_file = 'test_prob_preds.pkl'
+    elif args.mode == 'prob_cat':
+        train_file = 'train_prob_cat_preds.pkl'
+        test_file = 'test_prob_cat_preds.pkl'
     output_file = os.path.sep.join([input_dir, args.output_file])
     logger = get_logger()
     ssl._create_default_https_context = ssl._create_unverified_context

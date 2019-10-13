@@ -49,23 +49,23 @@ if __name__ == "__main__":
 
     logger.error("Predict training")
     train_preds = model.predict(stl10_x_train_resized)
-    train_prob_preds = train_preds[:, stl10_imagenet_mapping[0]].sum(axis=1)
+    train_prob_preds = train_preds[:, stl10_imagenet_mapping[0]].sum(axis=1) / len(stl10_imagenet_mapping[0])
     for i in range(1, 10):
-        train_prob_preds = np.hstack((train_prob_preds, train_preds[:, stl10_imagenet_mapping[i]].sum(axis=1)))
+        train_prob_preds = np.hstack((train_prob_preds, train_preds[:, stl10_imagenet_mapping[i]].sum(axis=1) / len(stl10_imagenet_mapping[0])))
     train_prob_preds = train_prob_preds.reshape((num_classes, train_preds.shape[0])).T
-    train_norm_prob_preds = softmax(train_prob_preds, axis=1)
+    train_norm_prob_preds = train_prob_preds/train_prob_preds.sum(axis=1, keepdims=1)
     logger.error("Store train predictions")
     with open(os.path.sep.join([args.save_dir, 'train_prob_preds.pkl']), 'wb') as file:
         pickle.dump(train_norm_prob_preds, file)
 
     logger.error("Predict test")
     test_preds = model.predict(stl10_x_test_resized)
-    test_prob_preds = test_preds[:, stl10_imagenet_mapping[0]].sum(axis=1)
+    test_prob_preds = test_preds[:, stl10_imagenet_mapping[0]].sum(axis=1) / len(stl10_imagenet_mapping[0])
     for i in range(1, 10):
-        test_prob_preds = np.hstack((test_prob_preds, test_preds[:, stl10_imagenet_mapping[i]].sum(axis=1)))
+        test_prob_preds = np.hstack((test_prob_preds, test_preds[:, stl10_imagenet_mapping[i]].sum(axis=1) / len(stl10_imagenet_mapping[0])))
     test_prob_preds = test_prob_preds.reshape((num_classes, test_preds.shape[0])).T
 
-    test_norm_prob_preds = softmax(test_prob_preds, axis=1)
+    test_norm_prob_preds = test_prob_preds/test_prob_preds.sum(axis=1, keepdims=1)
     logger.error("Store test predictions")
     with open(os.path.sep.join([args.save_dir, 'test_prob_preds.pkl']), 'wb') as file:
         pickle.dump(test_norm_prob_preds, file)

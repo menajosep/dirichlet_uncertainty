@@ -183,9 +183,9 @@ if __name__ == "__main__":
                         help='num units')
     parser.add_argument('--batch_size', type=int, default=64,
                         help='batch size')
-    parser.add_argument('--save_dir', type=str, default='./',
-                        help='dir to save the trained model')
-    parser.add_argument('--output_file', type=str, default='stl10_uncertainty_model',
+    parser.add_argument('--output_model_file', type=str, default='stl10_uncertainty_model',
+                        help='file to dump the generated model')
+    parser.add_argument('--output_history_file', type=str, default='stl10_uncertainty_history',
                         help='file to dump the generated data')
     parser.add_argument('--input_dir', type=str, default='./',
                         help='dir to load the trained model')
@@ -193,6 +193,8 @@ if __name__ == "__main__":
                         help='prediction mode: categorical|probabilities|prob_cat')
     parser.add_argument('--label_mapping_file', type=str, default='imagenet_stl10_mapping.pkl',
                         help='label mapping file')
+    parser.add_argument('--lambda_reg', type=float, default=1e-2,
+                        help='Lambda parameter for regularization of beta values')
 
     args = parser.parse_args()
     input_dir = args.input_dir
@@ -209,7 +211,9 @@ if __name__ == "__main__":
     elif args.mode == 'prob_cat':
         train_file = 'train_prob_cat_preds.pkl'
         test_file = 'test_prob_cat_preds.pkl'
-    output_file = os.path.sep.join([input_dir, args.output_file])
+    output_model_file = os.path.sep.join([input_dir, args.output_model_file])
+    output_history_file = os.path.sep.join([input_dir, args.output_history_file])
+    lambda_reg = args.lambda_reg
     logger = get_logger()
     ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -256,10 +260,14 @@ if __name__ == "__main__":
                                      shuffle=True,
                                      verbose=1,
                                      validation_split=0.1)
+
+    logger.info("Save the training history")
+    with open(output_history_file, 'wb') as file:
+        pickle.dump(training_history, file)
     logger.info("Save the model")
     tf.keras.models.save_model(
         unc_model,
-        output_file,
+        output_model_file,
         overwrite=True,
         include_optimizer=True,
         save_format=None

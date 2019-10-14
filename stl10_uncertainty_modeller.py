@@ -4,7 +4,7 @@ from tensorflow.python.keras.models import Sequential, Model
 from tensorflow.python.keras.layers import Dense, Dropout, Activation, Flatten, concatenate
 from tensorflow.python.keras.layers import Conv2D, MaxPooling2D, Dense, Input, GlobalAveragePooling2D
 from tensorflow.python.keras.optimizers import SGD, Adam
-from tensorflow.python.keras.applications import vgg16, mobilenet_v2, resnet50
+from tensorflow.python.keras.applications import vgg16, mobilenet_v2, resnet50, vgg19, inception_v3
 from tensorflow.python.keras.applications.mobilenet_v2 import decode_predictions
 from tensorflow.python.keras.utils import to_categorical
 
@@ -85,14 +85,26 @@ def min_beta(y_true, y_pred):
     return tf.reduce_min(beta)
 
 
-def create_uncertainty_model(learning_rate=1e-3, num_hidden_units=20):
+def create_uncertainty_model(learning_rate=1e-3, num_hidden_units=20, type = 'mobilenet_v2'):
     mu_input = Input(shape=(num_classes,))
-    base_model = mobilenet_v2.MobileNetV2(include_top=False, weights='imagenet', input_tensor=None,
+    if type == 'mobilenet_v2':
+        base_model = mobilenet_v2.MobileNetV2(include_top=False, weights='imagenet', input_tensor=None,
                                           input_shape=(224, 224, 3), pooling='avg', classes=num_classes)
-    # base_model = mobilenet_v2.MobileNetV2(include_top=False, weights=None, input_tensor=None, input_shape=(32, 32, 3), pooling='avg', classes=num_classes)
-    # base_model = vgg16.VGG16(include_top=False, weights=None, input_tensor=None, input_shape=(32, 32, 3), pooling='avg', classes=num_classes)
-    # base_model = resnet50.ResNet50(include_top=False, weights=None, input_tensor=None, input_shape=(32, 32, 3), pooling='avg', classes=num_classes)
-
+    elif type == 'vgg16':
+        base_model = vgg16.VGG16(include_top=False, weights='imagenet', input_tensor=None,
+                                 input_shape=(224, 224, 3), pooling='avg', classes=num_classes)
+    elif type == 'resnet50':
+        base_model = resnet50.ResNet50(include_top=False, weights='imagenet', input_tensor=None,
+                                 input_shape=(224, 224, 3), pooling='avg', classes=num_classes)
+    elif type == 'vgg19':
+        base_model = vgg19.VGG19(include_top=False, weights='imagenet', input_tensor=None,
+                                 input_shape=(224, 224, 3), pooling='avg', classes=num_classes)
+    elif type == 'inception_v3':
+        base_model = inception_v3.InceptionV3(include_top=False, weights='imagenet', input_tensor=None,
+                                 input_shape=(224, 224, 3), pooling='avg', classes=num_classes)
+    else:
+        base_model = mobilenet_v2.MobileNetV2(include_top=False, weights='imagenet', input_tensor=None,
+                                              input_shape=(224, 224, 3), pooling='avg', classes=num_classes)
     beta = base_model.output
     beta = Dense(num_hidden_units, activation='relu')(beta)
     beta = Dense(num_hidden_units, activation='relu')(beta)
@@ -195,6 +207,8 @@ if __name__ == "__main__":
                         help='label mapping file')
     parser.add_argument('--lambda_reg', type=float, default=1e-2,
                         help='Lambda parameter for regularization of beta values')
+    parser.add_argument('--model_type', type=str, default='mobilenet_v2',
+                        help='type of base model to learn the betas mobilenet_v2|vgg16|vgg19|resnet50|inception_v3')
 
     args = parser.parse_args()
     input_dir = args.input_dir
@@ -251,7 +265,7 @@ if __name__ == "__main__":
         [skimage.transform.resize(image, new_shape, anti_aliasing=True) for image in stl10_x_test])
 
     logger.info("Create uncertainty model")
-    unc_model = create_uncertainty_model(learning_rate=learning_rate, num_hidden_units=num_units)
+    unc_model = create_uncertainty_model(learning_rate=learning_rate, num_hidden_units=num_units, type=args.model_type)
     logger.info("train uncertainty")
     training_history = unc_model.fit([mu_predictions, stl10_x_train_resized],
                                      stl10_y_train_cat,

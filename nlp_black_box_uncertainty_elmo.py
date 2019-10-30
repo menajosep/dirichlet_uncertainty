@@ -1,0 +1,234 @@
+import argparse
+import pickle
+
+import gensim
+
+import pandas as pd
+import numpy as np
+from tensorflow.python.keras import backend as K
+from tensorflow.python.keras.layers import Layer
+from tensorflow.python.keras.layers import Dense, Dropout, Input, concatenate, Activation
+from tensorflow.python.keras.layers import BatchNormalization, Lambda
+from tensorflow.python.keras.metrics import categorical_accuracy
+from tensorflow.python.keras.callbacks import EarlyStopping, Callback
+from tensorflow.python.keras.regularizers import l2
+from tensorflow.python.keras.optimizers import Adam, SGD
+from tensorflow.python.keras.models import Model
+from tensorflow.python.keras.constraints import MaxNorm
+from tensorflow.python.keras.callbacks import ModelCheckpoint, EarlyStopping
+from tensorflow.python.keras.preprocessing import sequence
+from tensorflow.python.keras.preprocessing.text import Tokenizer
+import tensorflow as tf
+import tensorflow_probability as tfp
+import tensorflow_hub as hub
+
+from tools import process_text, MeanEmbeddingVectorizer, process_label
+from tools import get_logger
+
+
+# Create a custom layer that allows us to update weights (lambda layers do not have trainable parameters!)
+class ElmoEmbeddingLayer(Layer):
+    def __init__(self, **kwargs):
+        self.dimensions = 1024
+        self.trainable=True
+        super(ElmoEmbeddingLayer, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        self.elmo = hub.Module(ELMO_HUB_MODULE, trainable=self.trainable,
+                               name="{}_module".format(self.name))
+
+        #self.trainable_weights += K.tf.trainable_variables(scope="^{}_module/.*".format(self.name))
+        super(ElmoEmbeddingLayer, self).build(input_shape)
+
+    def call(self, x, mask=None):
+        result = self.elmo(K.squeeze(K.cast(x, tf.string), axis=1),
+                      as_dict=True,
+                      signature='default',
+                      )['default']
+        return result
+
+    def compute_mask(self, inputs, mask=None):
+        return K.not_equal(inputs, '--PAD--')
+
+    def compute_output_shape(self, input_shape):
+        return (input_shape[0], self.dimensions)
+
+
+def load_data(training_file, val_file, test_file):
+    train_df = pd.read_csv(training_file, sep='\t', names=['sentence','label'])
+    train_df = train_df.dropna()
+    val_df = pd.read_csv(val_file, sep='\t', names=['sentence','label'])
+    val_df = val_df.dropna()
+    test_df = pd.read_csv(test_file, sep='\t', names=['sentence','label'])
+    test_df = test_df.dropna()
+    return train_df, val_df, test_df
+
+
+def preprocess(df):
+    df['clean_text'] = df['sentence'].apply(process_text)
+    df = df[df['clean_text'].map(lambda d: len(d)) > 0]
+    df['sentiment'] = df['label'].apply(process_label)
+    return df
+
+
+def dirichlet_aleatoric_cross_entropy(y_true, y_pred):
+    # logits_mu = y_pred[:,:NUM_CLASSES]
+    mu_probs = y_pred[:, :NUM_CLASSES]
+    logits_sigma = y_pred[:, NUM_CLASSES:]
+    beta = logits_sigma
+    alpha = mu_probs * beta
+    dirichlet = tfp.distributions.Dirichlet(alpha)
+    z = dirichlet.sample(sample_shape=NUM_TRAINING_SAMPLES)
+    e_probs = tf.reduce_mean(z, axis=0)
+    log_probs = tf.log(e_probs + EPSILON)
+    cross_entropy = -(tf.reduce_sum(y_true * log_probs, axis=-1))
+    return cross_entropy + LAMBDA_REG * tf.reduce_sum(beta, axis=-1)
+
+
+# metric that outputs the max/min value for the sigma logits
+def max_sigma(y_true, y_pred):
+    logits_psi = y_pred[:, NUM_CLASSES:]
+    return tf.reduce_max(logits_psi)
+
+
+def min_sigma(y_true, y_pred):
+    logits_psi = y_pred[:, NUM_CLASSES:]
+    return tf.reduce_min(logits_psi)
+
+
+# metric that outputs the accuracy when only considering the logits_mu.
+# this accuracy should be the same that was obtained with the fake classifier
+# in its best epoch.
+def mu_accuracy(y_true, y_pred):
+    logits_phi = y_pred[:, :NUM_CLASSES]
+    labels_phi = y_true[:, :NUM_CLASSES]
+    return categorical_accuracy(labels_phi, logits_phi)
+
+
+def create_model(learning_rate=1e-3, num_hidden_units=20):
+    input_text = Input(shape=(1,), dtype="string")
+    embedding = ElmoEmbeddingLayer(trainable=False)(input_text)
+    probs_mu = Input(shape=(NUM_CLASSES,))
+    logits_sigma = Dense(num_hidden_units, activation='relu')(embedding)
+    logits_sigma = Dense(num_hidden_units,activation='relu')(logits_sigma)
+    logits_sigma = Dense(num_hidden_units,activation='relu')(logits_sigma)
+    logits_sigma = Dense(num_hidden_units,activation='relu')(logits_sigma)
+    logits_sigma = Dense(1, activation='softplus')(logits_sigma)
+    output = concatenate([probs_mu, logits_sigma])
+
+    model = Model(inputs=[input_text, probs_mu], outputs=output)
+    model.compile(loss=dirichlet_aleatoric_cross_entropy,
+                  optimizer=Adam(lr=learning_rate),
+                  metrics=[mu_accuracy])
+    return model
+
+
+def initialize_vars(sess):
+    sess.run(tf.local_variables_initializer())
+    sess.run(tf.global_variables_initializer())
+    sess.run(tf.tables_initializer())
+    K.set_session(sess)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="load the job offers from different sources to a common ES index")
+    parser.add_argument('--training_file', type=str, default='training.tsv',
+                        help='file with the training set')
+    parser.add_argument('--val_file', type=str, default='val.tsv',
+                        help='file with the validation set')
+    parser.add_argument('--test_file', type=str, default='val.tsv',
+                        help='file with the test set')
+    parser.add_argument('--training_preds', type=str, default='training_preds.p',
+                        help='file with the training set')
+    parser.add_argument('--val_preds', type=str, default='val_preds.p',
+                        help='file with the validation set')
+    parser.add_argument('--test_preds', type=str, default='test_preds.p',
+                        help='file with the test set')
+    parser.add_argument('--output_model_file', type=str, default='yelp2013_unc_model',
+                        help='file to dump the generated model')
+    parser.add_argument('--output_history_file', type=str, default='yelp2013_unc_history_elmo',
+                        help='file to dump the generated data')
+    parser.add_argument('--epochs', type=int, default=1,
+                        help='epochs to train uncertainty model')
+    parser.add_argument('--learning_rate', type=float, default=1e-2,
+                        help='learning rate')
+    parser.add_argument('--batch_size', type=int, default=128,
+                        help='batch size')
+    parser.add_argument('--num_hidden_units', type=int, default=40,
+                        help='num hidden units')
+    parser.add_argument('--elmo_model', type=str, default='/data/data2/jmena/ELMO/',
+                        help='elmo model')
+
+    args = parser.parse_args()
+    logger = get_logger()
+    logger.info("Load data")
+    train_df, val_df, test_df = load_data(args.training_file, args.val_file, args.test_file)
+    logger.info("Preprocess train data")
+    train_df = preprocess(train_df)
+    logger.info("Preprocess val data")
+    val_df = preprocess(val_df)
+    logger.info("Preprocess test data")
+    test_df = preprocess(test_df)
+
+    NUM_TRAINING_SAMPLES = 1000
+    NUM_PREDICTION_SAMPLES = 1000
+    NUM_CLASSES = 2
+    EPSILON = 1e-10
+    LAMBDA_REG = 1e-2
+    ELMO_HUB_MODULE = args.elmo_model
+
+    logger.info("Prepare features")
+    y_train = train_df['sentiment'].values  # target
+    y_train = np.eye(NUM_CLASSES)[y_train.astype(dtype=np.int32)]
+    y_val = val_df['sentiment'].values  # target
+    y_val = np.eye(NUM_CLASSES)[y_val.astype(dtype=np.int32)]
+    y_test = test_df['sentiment'].values  # target
+    y_test = np.eye(NUM_CLASSES)[y_test.astype(dtype=np.int32)]
+    max_seq_length = 120
+    # Create datasets (Only take up to 120 words for memory)
+    train_text = train_df['clean_text'].tolist()
+    train_text = [' '.join(t[0:max_seq_length]) for t in train_text]
+    train_text = np.array(train_text, dtype=object)[:, np.newaxis]
+
+    val_text = val_df['clean_text'].tolist()
+    val_text = [' '.join(t[0:max_seq_length]) for t in val_text]
+    val_text = np.array(val_text, dtype=object)[:, np.newaxis]
+
+    test_text = test_df['clean_text'].tolist()
+    test_text = [' '.join(t[0:max_seq_length]) for t in test_text]
+    test_text = np.array(test_text, dtype=object)[:, np.newaxis]
+
+    logger.info("Save the predictions")
+    with open(args.training_preds, 'rb') as file:
+        train_preds = pickle.load(file)
+    with open(args.val_preds, 'rb') as file:
+        val_preds = pickle.load(file)
+    with open(args.test_preds, 'rb') as file:
+        test_preds = pickle.load(file)
+
+    logger.info("Create model")
+    # Initialize session
+    sess = tf.Session()
+    model = create_model(learning_rate=args.learning_rate, num_hidden_units=args.num_hidden_units)
+    # Instantiate variables
+    initialize_vars(sess)
+    logger.info("Fit the model")
+    training_history = model.fit([train_text, train_preds],
+                                 y_train,
+                                 batch_size=args.batch_size,
+                                 epochs=args.epochs,
+                                 shuffle=True,
+                                 verbose=1,
+                                 validation_data=([val_text, val_preds], y_val))
+    logger.info("Save model")
+    tf.keras.models.save_model(
+        model,
+        args.output_model_file,
+        overwrite=True,
+        include_optimizer=True,
+        save_format=None
+    )
+    logger.info("Save the history")
+    with open(args.output_history_file, 'wb') as file:
+        pickle.dump(training_history.history, file)
+    logger.info("Done")

@@ -8,6 +8,17 @@ import numpy as np
 from itertools import combinations
 from gensim.models import Phrases
 from nltk.tokenize import TweetTokenizer
+from bert.tokenization import FullTokenizer
+import tensorflow_hub as hub
+import tensorflow as tf
+from tqdm import tqdm
+import tensorflow_probability as tfp
+
+NUM_TRAINING_SAMPLES = 1000
+NUM_PREDICTION_SAMPLES = 1000
+NUM_CLASSES = 2
+EPSILON = 1e-10
+LAMBDA_REG = 1e-2
 
 
 def get_logger():
@@ -230,34 +241,178 @@ class MeanEmbeddingVectorizer(object):
         ])
 
 
-class TfidfEmbeddingVectorizer(object):
-    def __init__(self, word2vec):
-        self.word2vec = word2vec
-        self.word2weight = None
-        self.dim = len(list(word2vec.values())[0])
+class PaddingInputExample(object):
+    """Fake example so the num input examples is a multiple of the batch size.
+  When running eval/predict on the TPU, we need to pad the number of examples
+  to be a multiple of the batch size, because the TPU requires a fixed batch
+  size. The alternative is to drop the last batch, which is bad because it means
+  the entire output data won't be generated.
+  We use this class instead of `None` because treating `None` as padding
+  battches could cause silent errors.
+  """
 
-    def fit(self, X, y):
-        tfidf = TfidfVectorizer(analyzer=lambda x: x)
-        tfidf.fit(X)
-        # if a word was never seen - it must be at least as infrequent
-        # as any of the known words - so the default idf is the max of
-        # known idf's
-        max_idf = max(tfidf.idf_)
-        self.word2weight = defaultdict(
-            lambda: max_idf,
-            [(w, tfidf.idf_[i]) for w, i in tfidf.vocabulary_.items()])
+class InputExample(object):
+    """A single training/test example for simple sequence classification."""
 
-        return self
+    def __init__(self, guid, text_a, text_b=None, label=None):
+        """Constructs a InputExample.
+    Args:
+      guid: Unique id for the example.
+      text_a: string. The untokenized text of the first sequence. For single
+        sequence tasks, only this sequence must be specified.
+      text_b: (Optional) string. The untokenized text of the second sequence.
+        Only must be specified for sequence pair tasks.
+      label: (Optional) string. The label of the example. This should be
+        specified for train and dev examples, but not for test examples.
+    """
+        self.guid = guid
+        self.text_a = text_a
+        self.text_b = text_b
+        self.label = label
 
-    def get_embedding(self, word):
-        if word in self.word2vec:
-            return self.word2vec[word] * self.word2weight[w]
-        else:
-            return np.zeros(self.dim)
+def create_tokenizer_from_hub_module(sess, bert_path):
+    """Get the vocab file and casing info from the Hub module."""
+    bert_module =  hub.Module(bert_path)
+    tokenization_info = bert_module(signature="tokenization_info", as_dict=True)
+    vocab_file, do_lower_case = sess.run(
+        [
+            tokenization_info["vocab_file"],
+            tokenization_info["do_lower_case"],
+        ]
+    )
 
-    def transform(self, X):
-        return np.array([
-            np.mean([self.get_embedding(w) for w in words],
-                    axis=0)
-            for words in X
-        ])
+    return FullTokenizer(vocab_file=vocab_file, do_lower_case=do_lower_case)
+
+def convert_single_example(tokenizer, example, max_seq_length=256):
+    """Converts a single `InputExample` into a single `InputFeatures`."""
+
+    if isinstance(example, PaddingInputExample):
+        input_ids = [0] * max_seq_length
+        input_mask = [0] * max_seq_length
+        segment_ids = [0] * max_seq_length
+        label = 0
+        return input_ids, input_mask, segment_ids, label
+
+    tokens_a = tokenizer.tokenize(example.text_a)
+    if len(tokens_a) > max_seq_length - 2:
+        tokens_a = tokens_a[0 : (max_seq_length - 2)]
+
+    tokens = []
+    segment_ids = []
+    tokens.append("[CLS]")
+    segment_ids.append(0)
+    for token in tokens_a:
+        tokens.append(token)
+        segment_ids.append(0)
+    tokens.append("[SEP]")
+    segment_ids.append(0)
+
+    input_ids = tokenizer.convert_tokens_to_ids(tokens)
+
+    # The mask has 1 for real tokens and 0 for padding tokens. Only real
+    # tokens are attended to.
+    input_mask = [1] * len(input_ids)
+
+    # Zero-pad up to the sequence length.
+    while len(input_ids) < max_seq_length:
+        input_ids.append(0)
+        input_mask.append(0)
+        segment_ids.append(0)
+
+    assert len(input_ids) == max_seq_length
+    assert len(input_mask) == max_seq_length
+    assert len(segment_ids) == max_seq_length
+
+    return input_ids, input_mask, segment_ids, example.label
+
+
+def convert_examples_to_features(tokenizer, examples, max_seq_length=256):
+    """Convert a set of `InputExample`s to a list of `InputFeatures`."""
+
+    input_ids, input_masks, segment_ids, labels = [], [], [], []
+    for example in tqdm(examples, desc="Converting examples to features"):
+        input_id, input_mask, segment_id, label = convert_single_example(
+            tokenizer, example, max_seq_length
+        )
+        input_ids.append(input_id)
+        input_masks.append(input_mask)
+        segment_ids.append(segment_id)
+        labels.append(label)
+    return (
+        np.array(input_ids),
+        np.array(input_masks),
+        np.array(segment_ids),
+        np.array(labels).reshape(-1, 1),
+    )
+
+def convert_text_to_examples(texts, labels):
+    """Create InputExamples"""
+    InputExamples = []
+    for text, label in zip(texts, labels):
+        InputExamples.append(
+            InputExample(guid=None, text_a=" ".join(text), text_b=None, label=label)
+        )
+    return InputExamples
+
+def predict_cross_entropy(y_true, y_pred):
+    prediction = tf.argmax(y_pred, axis=-1)
+    probs = y_pred
+    log_probs = tf.log(probs+EPSILON)
+    mu_entropy = -(tf.reduce_sum(probs * log_probs, axis=-1))
+    cross_entropy = -(tf.reduce_sum(y_true * log_probs, axis=-1))
+    return cross_entropy, mu_entropy, prediction
+
+
+def voting(y_pred):
+    mu_probs = y_pred[:,:NUM_CLASSES]
+    beta = y_pred[:,NUM_CLASSES:]
+    beta = tf.broadcast_to(beta,(lambda shape: (shape[0], shape[1]))(tf.shape(mu_probs)))
+    alpha = mu_probs * beta
+    dirichlet = tfp.distributions.Dirichlet(alpha)
+    z = dirichlet.sample(sample_shape=NUM_PREDICTION_SAMPLES)
+    z = tf.reshape(z, (lambda shape: (NUM_PREDICTION_SAMPLES, shape[0], shape[1]))(tf.shape(mu_probs)))
+    sampled_output = tf.argmax(z, axis=-1, output_type=tf.int32)
+    sampled_output = tf.reshape(sampled_output,
+                                (lambda shape: (NUM_PREDICTION_SAMPLES, -1))(tf.shape(sampled_output)))
+    sampled_output = tf.one_hot(sampled_output, axis=-1, depth=2)
+    sampled_output = tf.reduce_sum(sampled_output, axis=0)
+    winner_classes = tf.argmax(sampled_output, axis=1)
+    winner_classes = tf.one_hot(winner_classes, axis=-1, depth=2)
+    sampled_output = tf.reduce_sum(sampled_output * winner_classes, axis=-1)
+    return 1-sampled_output/NUM_PREDICTION_SAMPLES
+
+
+def predict_dirichlet_entropy_gal(y_pred):
+    mu_probs = y_pred[:,:NUM_CLASSES]
+    beta = y_pred[:,NUM_CLASSES:]
+    beta = tf.broadcast_to(beta,(lambda shape: (shape[0], shape[1]))(tf.shape(mu_probs)))
+    alpha = mu_probs * beta
+    dirichlet = tfp.distributions.Dirichlet(alpha)
+    z = dirichlet.sample(sample_shape=NUM_PREDICTION_SAMPLES)
+    e_probs = tf.reduce_mean(z, axis=0)
+    log_probs = tf.log(e_probs+EPSILON)
+    entropy = tf.reduce_sum(-e_probs*log_probs, axis=-1)
+    return entropy
+
+
+def get_rejection_measures(prediction, true_label, rejection_heuristic, rejection_point):
+    assert len(prediction) == len(true_label) == len(rejection_heuristic)
+    num_total_points = len(prediction)  # n
+    num_non_rejected_points = rejection_point  # N
+    num_rejected_points = num_total_points - rejection_point  # R
+    rejection_percentage = (num_rejected_points / num_total_points) * 100
+    accurately_classified = (np.sum(prediction[rejection_heuristic] ==
+                                    true_label[rejection_heuristic]))  # a
+
+    accurately_classified_non_rejected = (np.sum(prediction[rejection_heuristic][:rejection_point]
+                                                 == true_label[rejection_heuristic][:rejection_point]))  # a_N
+    accurately_classified_rejected = (np.sum(prediction[rejection_heuristic][rejection_point:]
+                                             == true_label[rejection_heuristic][rejection_point:]))  # a_R
+    non_rejected_accuracy = accurately_classified_non_rejected / num_non_rejected_points  # A = ||a_N|| / ||N||
+    classification_quality = (
+                (accurately_classified_non_rejected + (num_rejected_points - accurately_classified_rejected)) /
+                num_total_points)  # Q = ||a_N||+||1-a_R|| / n
+    rejection_quality = (((num_rejected_points - accurately_classified_rejected) / accurately_classified_rejected)
+                         / ((
+                                        num_total_points - accurately_classified) / accurately_classified))  # phi = ||1-a_R||/||a_r / ||1-a||/||a||
+    return non_rejected_accuracy, classification_quality, rejection_quality, rejection_percentage

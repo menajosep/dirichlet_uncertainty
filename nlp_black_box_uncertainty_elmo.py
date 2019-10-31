@@ -1,29 +1,21 @@
 import argparse
 import pickle
 
-import gensim
-
-import pandas as pd
 import numpy as np
-from tensorflow.python.keras import backend as K
-from tensorflow.python.keras.layers import Layer
-from tensorflow.python.keras.layers import Dense, Dropout, Input, concatenate, Activation
-from tensorflow.python.keras.layers import BatchNormalization, Lambda
-from tensorflow.python.keras.metrics import categorical_accuracy
-from tensorflow.python.keras.callbacks import EarlyStopping, Callback
-from tensorflow.python.keras.regularizers import l2
-from tensorflow.python.keras.optimizers import Adam, SGD
-from tensorflow.python.keras.models import Model
-from tensorflow.python.keras.constraints import MaxNorm
-from tensorflow.python.keras.callbacks import ModelCheckpoint, EarlyStopping
-from tensorflow.python.keras.preprocessing import sequence
-from tensorflow.python.keras.preprocessing.text import Tokenizer
+import pandas as pd
 import tensorflow as tf
-import tensorflow_probability as tfp
 import tensorflow_hub as hub
+import tensorflow_probability as tfp
+from tensorflow.python.keras import backend as K
+from tensorflow.python.keras.layers import Dense, Input, concatenate
+from tensorflow.python.keras.layers import Layer
+from tensorflow.python.keras.metrics import categorical_accuracy
+from tensorflow.python.keras.models import Model
+from tensorflow.python.keras.optimizers import Adam
 
-from tools import process_text, MeanEmbeddingVectorizer, process_label
 from tools import get_logger
+from tools import process_text, process_label, predict_cross_entropy, voting, \
+    predict_dirichlet_entropy_gal, get_rejection_measures
 
 
 # Create a custom layer that allows us to update weights (lambda layers do not have trainable parameters!)
@@ -158,6 +150,8 @@ if __name__ == "__main__":
                         help='num hidden units')
     parser.add_argument('--elmo_model', type=str, default='/data/data2/jmena/ELMO/',
                         help='elmo model')
+    parser.add_argument('--output_file', type=str, default='yelp2013_output',
+                        help='file to dump the generated data')
 
     args = parser.parse_args()
     logger = get_logger()
@@ -231,4 +225,31 @@ if __name__ == "__main__":
     logger.info("Save the history")
     with open(args.output_history_file, 'wb') as file:
         pickle.dump(training_history.history, file)
+
+    test_inputs = [test_text, test_preds]
+    logger.info("Fit the model")
+    predictions = model.predict(test_inputs)
+    logger.error("Compute uncertainty metrics")
+    logger.error("Compute mu pred. entropy")
+    error, mu_entropy, pred_y = sess.run(predict_cross_entropy(y_test, test_preds))
+    logger.error("Compute variation ratios")
+    voted_pred = K.get_session().run(voting(predictions))
+    logger.error("Compute beta pred. entropy")
+    sampling_entropy_gal = sess.run(predict_dirichlet_entropy_gal(predictions))
+    logger.error("Compute rejection measures")
+    rejection_measures = np.array(
+        [list(get_rejection_measures(pred_y, y_test, np.argsort(sampling_entropy_gal),
+                                     rejection_point))
+         for rejection_point in range(1, pred_y.shape[0] - 10)])
+    rejection_measures_baseline = np.array(
+        [list(get_rejection_measures(pred_y, y_test, np.argsort(mu_entropy), rejection_point))
+         for rejection_point in range(1, pred_y.shape[0] - 10)])
+    rejection_measures_voting = np.array(
+        [list(get_rejection_measures(pred_y, y_test, np.argsort(voted_pred), rejection_point))
+         for rejection_point in range(1, pred_y.shape[0] - 10)])
+    logger.error("Export results")
+    with open(args.output_file, 'wb') as file:
+        pickle.dump((mu_entropy, error, voted_pred, sampling_entropy_gal, rejection_measures,
+                     rejection_measures_baseline, rejection_measures_voting,
+                     y_test), file)
     logger.info("Done")

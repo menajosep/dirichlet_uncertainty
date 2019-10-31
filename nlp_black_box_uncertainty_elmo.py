@@ -66,8 +66,8 @@ def preprocess(df):
 def dirichlet_aleatoric_cross_entropy(y_true, y_pred):
     # logits_mu = y_pred[:,:NUM_CLASSES]
     mu_probs = y_pred[:, :NUM_CLASSES]
-    logits_sigma = y_pred[:, NUM_CLASSES:]
-    beta = logits_sigma
+    logits_beta = y_pred[:, NUM_CLASSES:]
+    beta = logits_beta
     alpha = mu_probs * beta
     dirichlet = tfp.distributions.Dirichlet(alpha)
     z = dirichlet.sample(sample_shape=NUM_TRAINING_SAMPLES)
@@ -77,13 +77,13 @@ def dirichlet_aleatoric_cross_entropy(y_true, y_pred):
     return cross_entropy + LAMBDA_REG * tf.reduce_sum(beta, axis=-1)
 
 
-# metric that outputs the max/min value for the sigma logits
-def max_sigma(y_true, y_pred):
+# metric that outputs the max/min value for the beta logits
+def max_beta(y_true, y_pred):
     logits_psi = y_pred[:, NUM_CLASSES:]
     return tf.reduce_max(logits_psi)
 
 
-def min_sigma(y_true, y_pred):
+def min_beta(y_true, y_pred):
     logits_psi = y_pred[:, NUM_CLASSES:]
     return tf.reduce_min(logits_psi)
 
@@ -101,17 +101,17 @@ def create_model(learning_rate=1e-3, num_hidden_units=20):
     input_text = Input(shape=(1,), dtype="string")
     embedding = ElmoEmbeddingLayer(trainable=False)(input_text)
     probs_mu = Input(shape=(NUM_CLASSES,))
-    logits_sigma = Dense(num_hidden_units, activation='relu')(embedding)
-    logits_sigma = Dense(num_hidden_units,activation='relu')(logits_sigma)
-    logits_sigma = Dense(num_hidden_units,activation='relu')(logits_sigma)
-    logits_sigma = Dense(num_hidden_units,activation='relu')(logits_sigma)
-    logits_sigma = Dense(1, activation='softplus')(logits_sigma)
-    output = concatenate([probs_mu, logits_sigma])
+    logits_beta = Dense(num_hidden_units, activation='relu')(embedding)
+    logits_beta = Dense(num_hidden_units,activation='relu')(logits_beta)
+    logits_beta = Dense(num_hidden_units,activation='relu')(logits_beta)
+    logits_beta = Dense(num_hidden_units,activation='relu')(logits_beta)
+    logits_beta = Dense(1, activation='softplus')(logits_beta)
+    output = concatenate([probs_mu, logits_beta])
 
     model = Model(inputs=[input_text, probs_mu], outputs=output)
     model.compile(loss=dirichlet_aleatoric_cross_entropy,
                   optimizer=Adam(lr=learning_rate),
-                  metrics=[mu_accuracy])
+                  metrics=[mu_accuracy, max_beta, min_beta])
     return model
 
 

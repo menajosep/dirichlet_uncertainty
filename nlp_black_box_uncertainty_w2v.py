@@ -209,16 +209,16 @@ if __name__ == "__main__":
     sampling_entropy_gal = sess.run(predict_dirichlet_entropy_gal(predictions))
     logger.error("Compute rejection measures")
     rejection_measures = np.array(
-        [list(get_rejection_measures(np.argmax(pred_y, axis=1), np.argmax(y_test, axis=1),
+        [list(get_rejection_measures(pred_y, np.argmax(y_test, axis=1),
                                      np.argsort(sampling_entropy_gal),
                                      rejection_point))
          for rejection_point in range(1, pred_y.shape[0] - 10)])
     rejection_measures_baseline = np.array(
-        [list(get_rejection_measures(np.argmax(pred_y, axis=1), np.argmax(y_test, axis=1), np.argsort(mu_entropy),
+        [list(get_rejection_measures(pred_y, np.argmax(y_test, axis=1), np.argsort(mu_entropy),
                                      rejection_point))
          for rejection_point in range(1, pred_y.shape[0] - 10)])
     rejection_measures_voting = np.array(
-        [list(get_rejection_measures(np.argmax(pred_y, axis=1), np.argmax(y_test, axis=1), np.argsort(voted_pred),
+        [list(get_rejection_measures(pred_y, np.argmax(y_test, axis=1), np.argsort(voted_pred),
                                      rejection_point))
          for rejection_point in range(1, pred_y.shape[0] - 10)])
     logger.error("Export results")

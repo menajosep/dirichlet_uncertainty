@@ -170,11 +170,11 @@ def create_model(learning_rate=1e-3, num_hidden_units=20):
     in_segment = tf.keras.layers.Input(shape=(max_seq_length,), name="segment_ids")
     bert_inputs = [in_id, in_mask, in_segment]
 
-    bert_output = BertLayer(n_fine_tune_layers=0, trainable=False, pooling="first")(bert_inputs)
+    bert_output = BertLayer(n_fine_tune_layers=0, trainable=False, pooling="mean")(bert_inputs)
     probs_mu = Input(shape=(NUM_CLASSES,))
-    logits_beta = Dense(num_hidden_units, activation='relu')(bert_output)
-    logits_beta = Dense(num_hidden_units,activation='relu')(logits_beta)
-    logits_beta = Dense(num_hidden_units,activation='relu')(logits_beta)
+    logits_beta = Dense(8*num_hidden_units, activation='relu')(bert_output)
+    logits_beta = Dense(4*num_hidden_units,activation='relu')(logits_beta)
+    logits_beta = Dense(2*num_hidden_units,activation='relu')(logits_beta)
     logits_beta = Dense(num_hidden_units,activation='relu')(logits_beta)
     logits_beta = Dense(1, activation='softplus')(logits_beta)
     output = concatenate([probs_mu, logits_beta])
@@ -220,7 +220,7 @@ if __name__ == "__main__":
     parser.add_argument('--num_hidden_units', type=int, default=40,
                         help='num hidden units')
     parser.add_argument('--bert_path', type=str, default='https://tfhub.dev/google/bert_uncased_L-12_H-768_A-12/1',
-                        help='elmo model')
+                        help='bert model')
     parser.add_argument('--output_file', type=str, default='yelp2013_output',
                         help='file to dump the generated data')
 

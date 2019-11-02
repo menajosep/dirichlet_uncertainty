@@ -223,8 +223,11 @@ if __name__ == "__main__":
                         help='bert model')
     parser.add_argument('--output_file', type=str, default='yelp2013_output',
                         help='file to dump the generated data')
+    parser.add_argument('--lambda_reg', type=float, default=1e-2,
+                        help='Lambda parameter for regularization of beta values')
 
     args = parser.parse_args()
+    LAMBDA_REG = args.lambda_reg
     logger = get_logger()
     logger.info("Load data")
     train_df, val_df, test_df = load_data(args.training_file, args.val_file, args.test_file)
@@ -239,7 +242,6 @@ if __name__ == "__main__":
     NUM_PREDICTION_SAMPLES = 1000
     NUM_CLASSES = 2
     EPSILON = 1e-10
-    LAMBDA_REG = 1e-2
     # Params for bert model and tokenization
     bert_path = args.bert_path
 

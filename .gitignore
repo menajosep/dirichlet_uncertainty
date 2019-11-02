@@ -8,3 +8,4 @@ output.pkl
 data/
 .ipynb_checkpoints/
 notebooks/
+*.log

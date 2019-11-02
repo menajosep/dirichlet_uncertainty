@@ -9,3 +9,4 @@ data/
 .ipynb_checkpoints/
 notebooks/
 *.log
+__pycache__/

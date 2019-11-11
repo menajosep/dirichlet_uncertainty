@@ -48,7 +48,8 @@ def predict_cross_entropy(y_true, y_pred):
     log_probs = tf.log(probs+epsilon)
     mu_entropy = -(tf.reduce_sum(probs * log_probs, axis=-1))
     cross_entropy = -(tf.reduce_sum(y_true * log_probs, axis=-1))
-    return cross_entropy, mu_entropy, prediction
+    softmax_response = 1 - tf.reduce_max(y_pred, axis=1)
+    return cross_entropy, mu_entropy, prediction, softmax_response
 
 
 def voting(y_pred):
@@ -166,7 +167,7 @@ if __name__ == "__main__":
     logger.error("Compute uncertainty metrics")
     sess = K.get_session()
     logger.error("Compute mu pred. entropy")
-    error, mu_entropy, pred_y = sess.run(predict_cross_entropy(stl10_y_test_cat, test_mu_predictions))
+    error, mu_entropy, pred_y, softmax_response = sess.run(predict_cross_entropy(stl10_y_test_cat, test_mu_predictions))
     logger.error("Compute variation ratios")
     voted_pred = K.get_session().run(voting(predictions))
     logger.error("Compute beta pred. entropy")
@@ -182,9 +183,12 @@ if __name__ == "__main__":
     rejection_measures_voting = np.array(
         [list(get_rejection_measures(pred_y, stl10_y_test, np.argsort(voted_pred), rejection_point))
          for rejection_point in range(1, pred_y.shape[0] - 10)])
+    rejection_measures_softmax_response = np.array(
+        [list(get_rejection_measures(pred_y, stl10_y_test, np.argsort(softmax_response), rejection_point))
+         for rejection_point in range(1, pred_y.shape[0] - 10)])
     logger.error("Export results")
     with open(output_file, 'wb') as file:
-        pickle.dump((mu_entropy, error, voted_pred, sampling_entropy_gal, rejection_measures,
-                     rejection_measures_baseline, rejection_measures_voting,
+        pickle.dump((softmax_response, mu_entropy, error, voted_pred, sampling_entropy_gal, rejection_measures,
+                     rejection_measures_baseline, rejection_measures_voting, rejection_measures_softmax_response,
                      stl10_y_test), file)
     logger.error("Done")

@@ -84,6 +84,24 @@ def predict_dirichlet_entropy_gal(y_pred):
     return entropy
 
 
+def get_least_confidence(probs):
+    most_conf = np.nanmax(probs, axis=1)
+    num_labels = probs.size
+    numerator = num_labels * (1- most_conf)
+    denominator = num_labels - 1
+    return numerator / denominator
+
+
+def get_margin_of_confidence(probs):
+    probs[::-1].sort()
+    difference = probs[:,0] - probs[:,1]
+    return 1 - difference
+
+
+def get_ratio_of_confidence(probs):
+    probs[::-1].sort()
+    return probs[:,1] / probs[:,0]
+
 def get_rejection_measures(prediction, true_label, rejection_heuristic, rejection_point):
     assert len(prediction) == len(true_label) == len(rejection_heuristic)
     num_total_points = len(prediction)  # n
@@ -168,6 +186,10 @@ if __name__ == "__main__":
     sess = K.get_session()
     logger.error("Compute mu pred. entropy")
     error, mu_entropy, pred_y, softmax_response = sess.run(predict_cross_entropy(stl10_y_test_cat, test_mu_predictions))
+    logger.error("Compute mu baselines")
+    least_confidence = get_least_confidence(test_mu_predictions)
+    margin_of_confidence = get_margin_of_confidence(test_mu_predictions)
+    ratio_of_confidence = get_ratio_of_confidence(test_mu_predictions)
     logger.error("Compute variation ratios")
     voted_pred = K.get_session().run(voting(predictions))
     logger.error("Compute beta pred. entropy")
@@ -186,9 +208,20 @@ if __name__ == "__main__":
     rejection_measures_softmax_response = np.array(
         [list(get_rejection_measures(pred_y, stl10_y_test, np.argsort(softmax_response), rejection_point))
          for rejection_point in range(1, pred_y.shape[0] - 10)])
+    rejection_measures_least_confidence = np.array(
+        [list(get_rejection_measures(pred_y, stl10_y_test, np.argsort(least_confidence), rejection_point))
+         for rejection_point in range(1, pred_y.shape[0] - 10)])
+    rejection_measures_margin_of_confidence = np.array(
+        [list(get_rejection_measures(pred_y, stl10_y_test, np.argsort(margin_of_confidence), rejection_point))
+         for rejection_point in range(1, pred_y.shape[0] - 10)])
+    rejection_measures_ratio_of_confidence = np.array(
+        [list(get_rejection_measures(pred_y, stl10_y_test, np.argsort(ratio_of_confidence), rejection_point))
+         for rejection_point in range(1, pred_y.shape[0] - 10)])
     logger.error("Export results")
     with open(output_file, 'wb') as file:
-        pickle.dump((softmax_response, mu_entropy, error, voted_pred, sampling_entropy_gal, rejection_measures,
+        pickle.dump((softmax_response, least_confidence, margin_of_confidence, ratio_of_confidence,
+                     mu_entropy, error, voted_pred, sampling_entropy_gal, rejection_measures,
                      rejection_measures_baseline, rejection_measures_voting, rejection_measures_softmax_response,
-                     stl10_y_test), file)
+                     rejection_measures_least_confidence, rejection_measures_margin_of_confidence,
+                     rejection_measures_ratio_of_confidence, stl10_y_test), file)
     logger.error("Done")

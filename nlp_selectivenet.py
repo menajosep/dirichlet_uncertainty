@@ -268,23 +268,24 @@ def calc_selective_risk(model, calibrated_coverage=None):
 def train_profile(input_filename, coverages, model_baseline=None, uncertainties=None, alpha=0.5, epochs=1):
     results = {}
     for coverage_rate in coverages:
+        logger.info("train selectivenet for {}".format(coverage_rate))
         model = Word2vecSelectiveNet(input_filename=input_filename,
                           coverage=coverage_rate,
                           alpha=alpha,epochs=epochs)
 
         loss, coverage = calc_selective_risk(model)
 
-        results[coverage] = {"lambda": coverage_rate, "selective_risk": loss}
+        results[coverage_rate] = {"lambda": coverage, "selective_risk": loss}
         if model_baseline is not None:
-            results[coverage]["baseline_sr_risk"] = (1 - model_baseline.selective_risk_at_coverage(coverage))
-            results[coverage]["percentage_sr"] = 1 - results[coverage]["selective_risk"] / results[coverage]["baseline_sr_risk"]
-            results[coverage]["baseline_mc_risk"] = (1 - model_baseline.selective_risk_at_coverage(coverage, mc=True))
-            results[coverage]["percentage_mc"] = 1 - results[coverage]["selective_risk"] / results[coverage]["baseline_mc_risk"]
+            results[coverage_rate]["baseline_sr_risk"] = (1 - model_baseline.selective_risk_at_coverage(coverage))
+            results[coverage_rate]["percentage_sr"] = 1 - results[coverage_rate]["selective_risk"] / results[coverage_rate]["baseline_sr_risk"]
+            results[coverage_rate]["baseline_mc_risk"] = (1 - model_baseline.selective_risk_at_coverage(coverage, mc=True))
+            results[coverage_rate]["percentage_mc"] = 1 - results[coverage_rate]["selective_risk"] / results[coverage_rate]["baseline_mc_risk"]
             if uncertainties is not None:
-                results[coverage]["baseline_unc_risk"] = (1 - model_baseline.selective_risk_at_coverage(coverage,
+                results[coverage_rate]["baseline_unc_risk"] = (1 - model_baseline.selective_risk_at_coverage(coverage,
                                                                                                         wrapper=True,
                                                                                                         uncertainties=uncertainties))
-                results[coverage]["percentage_unc"] = 1 - results[coverage]["selective_risk"] / results[coverage]["baseline_unc_risk"]
+                results[coverage_rate]["percentage_unc"] = 1 - results[coverage_rate]["selective_risk"] / results[coverage_rate]["baseline_unc_risk"]
     return results
 
 

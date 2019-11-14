@@ -341,7 +341,7 @@ if __name__ == "__main__":
     coverages = [0.95, 0.9, 0.85, 0.8, 0.75, 0.7]
     model_name = 'sst2_selectivenet'
     logger.info("train selectivenet")
-    results = train_profile(model_name, coverages, model_baseline=sst2_model_baseline,
+    results = train_profile(input_file_name, coverages, model_baseline=sst2_model_baseline,
                             alpha=alpha, uncertainties=sst2_test_uncertainties,
-                            epochs=seletivenet_epochs)
+                            epochs=seletivenet_epochs, input_filename=input_file_name)
     save_dict("{}.json".format(model_name), results)

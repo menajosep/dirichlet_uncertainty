@@ -244,8 +244,7 @@ class cifar10vgg:
 
         # training parameters
         batch_size = 128
-        #maxepoches = 300
-        maxepoches = 1
+        maxepoches = 300
         learning_rate = 0.1
 
         lr_decay = 1e-6
@@ -382,6 +381,7 @@ def calc_selective_risk(model, calibrated_coverage=None):
 def train_profile(model_name, coverages, model_baseline=None, uncertainties=None, alpha=0.5):
     results = {}
     for coverage_rate in coverages:
+        logger.info("train selectivenet for {}".format(coverage_rate))
         model = cifar10vgg(coverage=coverage_rate, alpha=alpha)
 
         loss, coverage = calc_selective_risk(model)
@@ -433,13 +433,19 @@ if __name__ == "__main__":
     lambda_reg = args.lambda_reg
     num_samples = args.num_samples
     logger = get_logger()
+    logger.info("create baseline")
     cifar10_model_baseline = cifar10vgg(baseline=True)
+    logger.info("predict val with baseline")
     cifar10_val_y_pred = cifar10_model_baseline.predict(cifar10_model_baseline.x_val)[1]
+    logger.info("predict test with baseline")
     cifar10_test_y_pred = cifar10_model_baseline.predict(cifar10_model_baseline.x_test)[1]
+    logger.info("learn the uncertainties")
     cifar10_wrapper = UncertaintyWrapper(lambda_reg, num_samples, learning_rate=learning_rate, num_hidden_units=num_units)
     cifar10_wrapper.train_model(cifar10_model_baseline.x_val, cifar10_model_baseline.y_val[:,:-1], cifar10_val_y_pred, epochs=epochs, batch_size=batch_size)
+    logger.info("predict the uncertainties")
     cifar10_test_uncertainties = K.get_session().run(cifar10_wrapper.predict_entropy(cifar10_model_baseline.x_test, cifar10_test_y_pred))
     coverages = [0.95, 0.9, 0.85, 0.8, 0.75, 0.7]
     model_name = 'cifar10_selectivenet'
+    logger.info("train selectivenet")
     results = train_profile(model_name, coverages, model_baseline=cifar10_model_baseline, alpha=alpha, uncertainties=cifar10_test_uncertainties)
     save_dict("{}.json".format(model_name), results)

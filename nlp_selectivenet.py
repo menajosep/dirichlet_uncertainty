@@ -334,7 +334,7 @@ if __name__ == "__main__":
     logger.info("learn the uncertainties")
     sst2_wrapper = UncertaintyWrapper(lambda_reg, num_samples,
                                       learning_rate=learning_rate, num_hidden_units=num_units)
-    sst2_wrapper.train_model(sst2_model_baseline.x_val, sst2_model_baseline.y_val, sst2_val_y_pred,
+    sst2_wrapper.train_model(sst2_model_baseline.x_val, sst2_model_baseline.y_val[:,:-1], sst2_val_y_pred,
                              epochs=epochs, batch_size=batch_size)
     logger.info("predict the uncertainties")
     sst2_test_uncertainties = K.get_session().run(sst2_wrapper.predict_entropy(sst2_model_baseline.x_test, sst2_test_y_pred))

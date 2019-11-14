@@ -302,6 +302,8 @@ if __name__ == "__main__":
                         help='batch size')
     parser.add_argument('--output_results_file', type=str, default='cifar10_results',
                         help='file to dump the results obtained')
+    parser.add_argument('--input_file_name', type=str, default='sst2_data.p',
+                        help='file to load the data from')
     parser.add_argument('--alpha', type=float, default=0.5,
                         help='weigth of the selective loss')
     parser.add_argument('--num_samples', type=int, default=1000,

@@ -37,7 +37,7 @@ class Word2vecSelectiveNet:
         y = self.y_train
         if baseline:
             self.alpha = 0
-        self.x_shape = self.X.shape[1:]
+        self.x_shape = X.shape[1:]
         self.model = self.build_model()
         self.model = self.train(X, y, self.model)
 

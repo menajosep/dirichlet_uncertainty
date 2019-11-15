@@ -33,9 +33,13 @@ class Word2vecSelectiveNet:
         self._load_data(input_filename)
         self.x_shape = self.x_train.shape[1:]
         self.model = self.build_model()
+        X = self.x_train
+        y = self.y_train
         if baseline:
             self.alpha = 0
-        self.model = self.train(self.model)
+        self.x_shape = self.X.shape[1:]
+        self.model = self.build_model()
+        self.model = self.train(X, y, self.model)
 
     def build_model(self):
         # Build the network of vgg for 10 classes with massive dropout and weight decay as described in the paper.
@@ -114,7 +118,7 @@ class Word2vecSelectiveNet:
         self.y_val = to_categorical(np.argmax(val_y, axis=1), self.num_classes + 1)
         self.y_test = to_categorical(np.argmax(test_y, axis=1), self.num_classes + 1)
 
-    def train(self, model):
+    def train(self, X, y, model):
         c = self.lamda
         lamda = 32
 
@@ -154,7 +158,7 @@ class Word2vecSelectiveNet:
         model.compile(loss=[selective_loss, 'categorical_crossentropy'], loss_weights=[self.alpha, 1 - self.alpha],
                       optimizer=sgd, metrics=['accuracy', selective_acc, coverage])
 
-        historytemp = model.fit([self.x_train], [self.y_train, self.y_train[:, :-1]], batch_size=batch_size,
+        historytemp = model.fit([X], [y, y[:, :-1]], batch_size=batch_size,
                                 epochs=maxepoches, callbacks=[reduce_lr],
                                 validation_split=0.2)
 
@@ -291,6 +295,8 @@ def train_profile(input_filename, coverages, model_baseline=None, uncertainties=
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="load the job offers from different sources to a common ES index")
+    parser.add_argument('--model_name', type=str, default='nlp',
+                        help='name of the model')
     parser.add_argument('--epochs', type=int, default=1,
                         help='epochs to train uncertainty model')
     parser.add_argument('--seletivenet_epochs', type=int, default=1,
@@ -313,6 +319,7 @@ if __name__ == "__main__":
                         help='Lambda parameter for regularization of beta values')
 
     args = parser.parse_args()
+    model_name = args.model_name
     input_file_name = args.input_file_name
     epochs = args.epochs
     seletivenet_epochs = args.seletivenet_epochs
@@ -340,7 +347,6 @@ if __name__ == "__main__":
     logger.info("predict the uncertainties")
     sst2_test_uncertainties = K.get_session().run(sst2_wrapper.predict_entropy(sst2_model_baseline.x_test, sst2_test_y_pred))
     coverages = [0.95, 0.9, 0.85, 0.8, 0.75, 0.7]
-    model_name = 'sst2_selectivenet'
     logger.info("train selectivenet")
     results = train_profile(input_file_name, coverages, model_baseline=sst2_model_baseline,
                             alpha=alpha, uncertainties=sst2_test_uncertainties,

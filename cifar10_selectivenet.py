@@ -36,14 +36,15 @@ class cifar10vgg:
         self.num_classes = 10
         self.weight_decay = 0.0005
         self._load_data()
-
-        self.x_shape = self.x_train.shape[1:]
-
-        self.model = self.build_model()
+        X = self.x_val
+        y = self.y_val
         if baseline:
             self.alpha = 0
-
-        self.model = self.train(self.model)
+            X = self.x_train
+            y = self.y_train
+        self.x_shape = X.shape[1:]
+        self.model = self.build_model()
+        self.model = self.train(X, y, self.model)
 
     def build_model(self):
         # Build the network of vgg for 10 classes with massive dropout and weight decay as described in the paper.
@@ -221,7 +222,7 @@ class cifar10vgg:
         self.y_val = to_categorical(y_val, self.num_classes + 1)
         self.y_test = to_categorical(y_test_label, self.num_classes + 1)
 
-    def train(self, model):
+    def train(self, X, y, model):
         c = self.lamda
         lamda = 32
 
@@ -262,7 +263,7 @@ class cifar10vgg:
         model.compile(loss=[selective_loss, 'categorical_crossentropy'], loss_weights=[self.alpha, 1 - self.alpha],
                       optimizer=sgd, metrics=['accuracy', selective_acc, coverage])
 
-        historytemp = model.fit([self.x_train], [self.y_train, self.y_train[:, :-1]], batch_size=batch_size,
+        historytemp = model.fit([X], [y, y[:, :-1]], batch_size=batch_size,
                               epochs=maxepoches, callbacks=[reduce_lr],
                               validation_split=0.2)
         return model
@@ -406,6 +407,8 @@ def train_profile(model_name, coverages, model_baseline=None, uncertainties=None
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="load the job offers from different sources to a common ES index")
+    parser.add_argument('--model_name', type=str, default='nlp',
+                        help='name of the model')
     parser.add_argument('--epochs', type=int, default=1,
                         help='epochs to train uncertainty model')
     parser.add_argument('--learning_rate', type=float, default=1e-2,
@@ -424,6 +427,7 @@ if __name__ == "__main__":
                         help='Lambda parameter for regularization of beta values')
 
     args = parser.parse_args()
+    model_name = args.model_name
     epochs = args.epochs
     learning_rate = args.learning_rate
     num_units = args.num_units
@@ -445,7 +449,6 @@ if __name__ == "__main__":
     logger.info("predict the uncertainties")
     cifar10_test_uncertainties = K.get_session().run(cifar10_wrapper.predict_entropy(cifar10_model_baseline.x_test, cifar10_test_y_pred))
     coverages = [0.95, 0.9, 0.85, 0.8, 0.75, 0.7]
-    model_name = 'cifar10_selectivenet'
     logger.info("train selectivenet")
     results = train_profile(model_name, coverages, model_baseline=cifar10_model_baseline, alpha=alpha, uncertainties=cifar10_test_uncertainties)
     save_dict("{}.json".format(model_name), results)

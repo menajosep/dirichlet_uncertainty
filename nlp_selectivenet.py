@@ -31,8 +31,6 @@ class Word2vecSelectiveNet:
         self.weight_decay = 0.0005
         self.num_classes = 2
         self._load_data(input_filename)
-        self.x_shape = self.x_train.shape[1:]
-        self.model = self.build_model()
         X = self.x_val
         y = self.y_val
         if baseline:

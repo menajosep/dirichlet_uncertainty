@@ -33,10 +33,12 @@ class Word2vecSelectiveNet:
         self._load_data(input_filename)
         self.x_shape = self.x_train.shape[1:]
         self.model = self.build_model()
-        X = self.x_train
-        y = self.y_train
+        X = self.x_val
+        y = self.y_val
         if baseline:
             self.alpha = 0
+            X = self.x_train
+            y = self.y_train
         self.x_shape = X.shape[1:]
         self.model = self.build_model()
         self.model = self.train(X, y, self.model)

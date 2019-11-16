@@ -93,14 +93,15 @@ def get_least_confidence(probs):
 
 
 def get_margin_of_confidence(probs):
-    probs[::-1].sort()
-    difference = probs[:,0] - probs[:,1]
+    aux = probs.copy()
+    aux[::-1].sort()
+    difference = aux[:,0] - aux[:,1]
     return 1 - difference
 
-
 def get_ratio_of_confidence(probs):
-    probs[::-1].sort()
-    return probs[:,1] / probs[:,0]
+    aux = probs.copy()
+    aux[::-1].sort()
+    return aux[:,1] / aux[:,0]
 
 def get_rejection_measures(prediction, true_label, rejection_heuristic, rejection_point):
     assert len(prediction) == len(true_label) == len(rejection_heuristic)

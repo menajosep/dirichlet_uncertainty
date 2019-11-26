@@ -204,7 +204,7 @@ if __name__ == "__main__":
         [list(get_rejection_measures(pred_y, stl10_y_test, np.argsort(mu_entropy), rejection_point))
          for rejection_point in range(1, pred_y.shape[0] - 10)])
     rejection_measures_voting = np.array(
-        [list(get_rejection_measures(pred_y, stl10_y_test, np.argsort(voted_pred), rejection_point))
+        [list(get_rejection_measures(pred_y, stl10_y_test, np.argsort(voted_pred)[::-1], rejection_point))
          for rejection_point in range(1, pred_y.shape[0] - 10)])
     rejection_measures_softmax_response = np.array(
         [list(get_rejection_measures(pred_y, stl10_y_test, np.argsort(softmax_response), rejection_point))

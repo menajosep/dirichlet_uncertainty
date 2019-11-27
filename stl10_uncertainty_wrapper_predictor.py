@@ -117,6 +117,6 @@ if __name__ == "__main__":
     sess = K.get_session()
     logger.error("Compute mu pred. entropy")
     probs = sess.run(predict_probs(predictions))
-    accuracy = accuracy_score(stl10_y_train, np.argmax(predictions, axis=1))
+    accuracy = accuracy_score(stl10_y_test, np.argmax(predictions, axis=1))
     logger.error("Resulting accuracy: {}".format(accuracy))
     logger.error("Done")

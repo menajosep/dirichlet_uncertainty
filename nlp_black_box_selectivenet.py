@@ -182,7 +182,6 @@ if __name__ == "__main__":
                         help='weigth of the selective loss')
 
     args = parser.parse_args()
-    model_name = args.model_name
     input_file_name = args.input_file_name
     preds_file_name = args.preds_file_name
     epochs = args.epochs

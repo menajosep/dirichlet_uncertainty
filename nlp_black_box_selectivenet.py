@@ -192,5 +192,5 @@ if __name__ == "__main__":
     #coverages = [0.95, 0.9, 0.85, 0.8, 0.75, 0.7]
     coverages = [0.95]
     logger.info("train selectivenet")
-    results = train_profile(input_file_name, preds_file_name, coverages)
+    results = train_profile(input_file_name, preds_file_name, coverages, epochs=epochs)
     save_dict(output_results_file, results)

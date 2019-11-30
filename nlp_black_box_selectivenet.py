@@ -170,8 +170,6 @@ def save_dict(filename, dict):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="load the job offers from different sources to a common ES index")
-    parser.add_argument('--model_name', type=str, default='sst2_yelp2013_nlp',
-                        help='name of the model')
     parser.add_argument('--epochs', type=int, default=1,
                         help='epochs to train uncertainty model')
     parser.add_argument('--output_results_file', type=str, default='sst2_yelp2013_results',
@@ -196,4 +194,4 @@ if __name__ == "__main__":
     coverages = [0.95]
     logger.info("train selectivenet")
     results = train_profile(input_file_name, preds_file_name, coverages)
-    save_dict("{}.json".format(model_name), results)
+    save_dict(output_results_file, results)

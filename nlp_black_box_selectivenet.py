@@ -98,6 +98,10 @@ class Word2vecBlackBoxSelectiveNet:
         )
         return temp1 / np.sum(g)
 
+    def test_selective_coverage(self, y_true, y_pred):
+        g = np.greater(y_pred[:, -1], 0.5).astype(float)
+        return np.mean(g)
+
     def train(self):
         c = self.lamda
         lamda = 32
@@ -144,8 +148,9 @@ class Word2vecBlackBoxSelectiveNet:
         # get accuracy for test
         test_pred = self.model.predict([self.x_test, self.y_pred_test])
         test_acc = self.test_selective_acc(self.y_test[:, :-1], test_pred)
+        test_coverage = self.test_selective_coverage(self.y_test[:, :-1], test_pred)
 
-        return test_acc
+        return test_acc, test_coverage
 
 
 def train_profile(input_filename, preds_filename, coverages, alpha=0.5, epochs=1):
@@ -157,9 +162,9 @@ def train_profile(input_filename, preds_filename, coverages, alpha=0.5, epochs=1
                           coverage=coverage_rate,
                           alpha=alpha, epochs=epochs)
 
-        acc = model.train()
+        acc, coverage = model.train()
 
-        results[coverage_rate] = acc
+        results[coverage_rate] = {'accuracy': acc, 'coverage': coverage}
     return results
 
 
@@ -172,7 +177,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="load the job offers from different sources to a common ES index")
     parser.add_argument('--epochs', type=int, default=1,
                         help='epochs to train uncertainty model')
-    parser.add_argument('--output_results_file', type=str, default='sst2_yelp2013_results',
+    parser.add_argument('--output_results_file', type=str, default='sst2_yelp2013_results.json',
                         help='file to dump the results obtained')
     parser.add_argument('--input_file_name', type=str, default='data/YELP20132SST2/sst2_data.p',
                         help='file to load the data from')
@@ -189,8 +194,7 @@ if __name__ == "__main__":
     alpha = args.alpha
     logger = get_logger()
 
-    #coverages = [0.95, 0.9, 0.85, 0.8, 0.75, 0.7]
-    coverages = [0.95]
+    coverages = [0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6]
     logger.info("train selectivenet")
     results = train_profile(input_file_name, preds_file_name, coverages, epochs=epochs)
     save_dict(output_results_file, results)

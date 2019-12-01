@@ -62,7 +62,7 @@ class Word2vecBlackBoxSelectiveNet:
         # auxiliary head (h)
         selective_output = Concatenate(axis=1, name="selective_head")([curr1, curr2])
 
-        auxiliary_output = probs_mu
+        #auxiliary_output = probs_mu
 
         model = Model(inputs=[model_input, probs_mu], outputs=[selective_output])
         return model
@@ -141,9 +141,9 @@ class Word2vecBlackBoxSelectiveNet:
 
         self.model.compile(loss=[selective_loss], optimizer=sgd, metrics=[selective_acc, coverage])
 
-        self.model.fit([self.x_train, self.y_pred_train], [self.y_train[:, :-1]], batch_size=batch_size,
+        self.model.fit([self.x_train, self.y_pred_train], [self.y_train], batch_size=batch_size,
                                 epochs=maxepoches, callbacks=[reduce_lr],
-                                validation_data=([self.x_val, self.y_pred_val], [self.y_val[:, :-1]]))
+                                validation_data=([self.x_val, self.y_pred_val], [self.y_val]))
 
         # get accuracy for test
         test_pred = self.model.predict([self.x_test, self.y_pred_test])
@@ -177,7 +177,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="load the job offers from different sources to a common ES index")
     parser.add_argument('--epochs', type=int, default=1,
                         help='epochs to train uncertainty model')
-    parser.add_argument('--output_results_file', type=str, default='sst2_yelp2013_results.json',
+    parser.add_argument('--output_results_file', type=str, default='data/YELP20132SST2/sst2_yelp2013_results.json',
                         help='file to dump the results obtained')
     parser.add_argument('--input_file_name', type=str, default='data/YELP20132SST2/sst2_data.p',
                         help='file to load the data from')

@@ -41,11 +41,13 @@ def dirichlet_aleatoric_cross_entropy(y_true, y_pred):
 
         Parameters
         ----------
-        y_true: `np.array`
+        y_true:  `np.array`
+            the labels in one hot encoding format
+
+        y_pred: `np.array`
             output of the model formed by the concatenation of the original prediction
             in the first num_classes positions, and a beta scalar in the last one
-        y:  `np.array`
-            the labels in one hot encoding format
+
 
         Returns
         -------

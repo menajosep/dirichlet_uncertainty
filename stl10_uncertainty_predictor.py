@@ -63,10 +63,10 @@ def voting(y_pred):
     sampled_output = tf.argmax(z, axis=-1, output_type=tf.int32)
     sampled_output = tf.reshape(sampled_output,
                                 (lambda shape: (NUM_PREDICITION_SAMPLES, -1))(tf.shape(sampled_output)))
-    sampled_output = tf.one_hot(sampled_output, axis=-1, depth=2)
+    sampled_output = tf.one_hot(sampled_output, axis=-1, depth=num_classes)
     sampled_output = tf.reduce_sum(sampled_output, axis=0)
     winner_classes = tf.argmax(sampled_output, axis=1)
-    winner_classes = tf.one_hot(winner_classes, axis=-1, depth=2)
+    winner_classes = tf.one_hot(winner_classes, axis=-1, depth=num_classes)
     sampled_output = tf.reduce_sum(sampled_output * winner_classes, axis=-1)
     return 1-sampled_output/NUM_PREDICITION_SAMPLES
 

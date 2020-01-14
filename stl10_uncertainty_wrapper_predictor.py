@@ -36,6 +36,8 @@ import random
 import skimage
 from stl10_data_loader import STL10Loader
 from sklearn.metrics import accuracy_score
+from netcal.metrics import ECE
+from netcal.scaling import TemperatureScaling
 
 epsilon = 1e-10
 lambda_reg = 1e-2
@@ -119,4 +121,19 @@ if __name__ == "__main__":
     probs = sess.run(predict_probs(predictions))
     accuracy = accuracy_score(stl10_y_test, np.argmax(predictions, axis=1))
     logger.error("Resulting accuracy: {}".format(accuracy))
+
+    n_bins = 10
+    ground_truth = stl10_y_test
+    confidences = test_mu_predictions
+
+    temperature = TemperatureScaling()
+    temperature.fit(confidences, ground_truth)
+    calibrated = temperature.transform(confidences)
+    n_bins = 10
+
+    ece = ECE(n_bins)
+    uncalibrated_score = ece.measure(confidences, ground_truth)
+    calibrated_score = ece.measure(calibrated, ground_truth)
+    wrapper_score = ece.measure(predictions, ground_truth)
+    logger.error("ECE scores: {}, {}, {}".format(uncalibrated_score, calibrated_score, wrapper_score))
     logger.error("Done")

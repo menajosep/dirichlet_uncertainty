@@ -134,6 +134,6 @@ if __name__ == "__main__":
     ece = ECE(n_bins)
     uncalibrated_score = ece.measure(confidences, ground_truth)
     calibrated_score = ece.measure(calibrated, ground_truth)
-    wrapper_score = ece.measure(predictions, ground_truth)
+    wrapper_score = ece.measure(probs, ground_truth)
     logger.error("ECE scores: {}, {}, {}".format(uncalibrated_score, calibrated_score, wrapper_score))
     logger.error("Done")

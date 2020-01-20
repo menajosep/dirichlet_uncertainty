@@ -107,6 +107,7 @@ def create_uncertainty_model(learning_rate=1e-3, num_hidden_units=20, type = 'mo
     else:
         base_model = mobilenet_v2.MobileNetV2(include_top=False, weights='imagenet', input_tensor=None,
                                               input_shape=(224, 224, 3), pooling='avg', classes=num_classes)
+    base_model.trainable = False
     beta = base_model.output
     beta = Dense(num_hidden_units, activation='relu')(beta)
     beta = Dense(num_hidden_units, activation='relu')(beta)

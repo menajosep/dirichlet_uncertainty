@@ -113,7 +113,7 @@ def create_uncertainty_model(learning_rate=1e-3, num_hidden_units=20, type = 'mo
     beta = Dense(num_hidden_units, activation='relu')(beta)
     beta = Dense(num_hidden_units, activation='relu')(beta)
     # beta = Dense(num_hidden_units,activation='relu')(beta)
-    beta = Dense(1, activation='softplus')(beta)
+    beta = Dense(1, activation='sigmoid')(beta)
     output = concatenate([mu_input, beta])
 
     model = Model(inputs=[mu_input, base_model.input], outputs=output)

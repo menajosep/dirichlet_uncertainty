@@ -259,6 +259,6 @@ if __name__ == "__main__":
                      sampling_entropy_gal_unlabeled, sampling_entropy_gal_ood_unlabeled, rejection_measures,
                      rejection_measures_baseline, rejection_measures_voting, rejection_measures_softmax_response,
                      rejection_measures_least_confidence, rejection_measures_margin_of_confidence,
-                     rejection_measures_ratio_of_confidence, stl10_y_test), file)
+                     rejection_measures_ratio_of_confidence, stl10_y_test, stl10_unlabeled_test), file)
 
     logger.error("Done")

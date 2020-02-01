@@ -205,6 +205,7 @@ if __name__ == "__main__":
     voted_pred = K.get_session().run(voting(predictions))
     logger.error("Compute beta pred. entropy")
     sampling_entropy_gal = sess.run(predict_dirichlet_entropy_gal(predictions))
+    sampling_entropy_gal_ood = sess.run(predict_dirichlet_entropy_gal(predictions_ood))
     logger.error("Compute rejection measures")
     rejection_measures = np.array(
         [list(get_rejection_measures(pred_y, stl10_y_test, np.argsort(sampling_entropy_gal),
@@ -247,12 +248,15 @@ if __name__ == "__main__":
 
     predictions_unlabeled = unc_model.predict([test_mu_predictions_ood, stl10_unlabeled_test_resized])
     predictions_ood_unlabeled = unc_ood_model.predict([test_mu_predictions_ood, stl10_unlabeled_test_resized])
+    sampling_entropy_gal_unlabeled = sess.run(predict_dirichlet_entropy_gal(predictions_unlabeled))
+    sampling_entropy_gal_ood_unlabeled = sess.run(predict_dirichlet_entropy_gal(predictions_ood_unlabeled))
 
     logger.error("Export results")
     with open(output_file, 'wb') as file:
         pickle.dump((predictions, predictions_ood, predictions_unlabeled, predictions_ood_unlabeled,
                      softmax_response, least_confidence, margin_of_confidence, ratio_of_confidence,
-                     mu_entropy, error, voted_pred, sampling_entropy_gal, rejection_measures,
+                     mu_entropy, error, voted_pred, sampling_entropy_gal, sampling_entropy_gal_ood,
+                     sampling_entropy_gal_unlabeled, sampling_entropy_gal_ood_unlabeled, rejection_measures,
                      rejection_measures_baseline, rejection_measures_voting, rejection_measures_softmax_response,
                      rejection_measures_least_confidence, rejection_measures_margin_of_confidence,
                      rejection_measures_ratio_of_confidence, stl10_y_test), file)

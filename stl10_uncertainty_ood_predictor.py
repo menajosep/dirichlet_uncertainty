@@ -211,6 +211,10 @@ if __name__ == "__main__":
         [list(get_rejection_measures(pred_y, stl10_y_test, np.argsort(sampling_entropy_gal),
                                      rejection_point))
          for rejection_point in range(1, pred_y.shape[0] - 10)])
+    rejection_measures_ood = np.array(
+        [list(get_rejection_measures(pred_y, stl10_y_test, np.argsort(sampling_entropy_gal_ood),
+                                     rejection_point))
+         for rejection_point in range(1, pred_y.shape[0] - 10)])
     rejection_measures_baseline = np.array(
         [list(get_rejection_measures(pred_y, stl10_y_test, np.argsort(mu_entropy), rejection_point))
          for rejection_point in range(1, pred_y.shape[0] - 10)])
@@ -256,7 +260,8 @@ if __name__ == "__main__":
         pickle.dump((predictions, predictions_ood, predictions_unlabeled, predictions_ood_unlabeled,
                      softmax_response, least_confidence, margin_of_confidence, ratio_of_confidence,
                      mu_entropy, error, voted_pred, sampling_entropy_gal, sampling_entropy_gal_ood,
-                     sampling_entropy_gal_unlabeled, sampling_entropy_gal_ood_unlabeled, rejection_measures,
+                     sampling_entropy_gal_unlabeled, sampling_entropy_gal_ood_unlabeled,
+                     rejection_measures, rejection_measures_ood,
                      rejection_measures_baseline, rejection_measures_voting, rejection_measures_softmax_response,
                      rejection_measures_least_confidence, rejection_measures_margin_of_confidence,
                      rejection_measures_ratio_of_confidence, stl10_y_test, stl10_unlabeled_test), file)

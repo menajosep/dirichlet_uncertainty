@@ -27,6 +27,7 @@ import pickle
 
 epsilon = 1e-10
 lambda_reg = 1e-2
+num_classes = 10
 
 NUM_PREDICITION_SAMPLES = 1000
 
@@ -235,7 +236,7 @@ if __name__ == "__main__":
     ssl._create_default_https_context = ssl._create_unverified_context
 
     new_shape = (224, 224, 3)
-    num_classes = 10
+
 
     logger.info('Load mapping file')
     with open(args.label_mapping_file, 'rb') as file:

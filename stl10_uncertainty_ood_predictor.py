@@ -157,11 +157,6 @@ if __name__ == "__main__":
     logger.info('Load  test dataset')
     with open(os.path.sep.join([input_dir, test_file]), 'rb') as file:
         test_mu_predictions = pickle.load(file)
-        if args.mode == 'categorical':
-            test_pred_y = [
-                imagenet_stl10_mapping[label[0][1]] if imagenet_stl10_mapping[label[0][1]] is not None else random.randint(
-                    0, 9) for label in decode_predictions(test_mu_predictions, top=1)]
-            test_mu_predictions = to_categorical(test_pred_y, num_classes)
 
     logger.error("Loading STL-10")
     stl10_data_loader = STL10Loader(num_classes)

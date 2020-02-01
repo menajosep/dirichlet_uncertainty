@@ -12,7 +12,7 @@ HEIGHT, WIDTH, DEPTH = 96, 96, 3
 SIZE = HEIGHT * WIDTH * DEPTH
 
 # path to the directory with the data
-#DATA_DIR = '/data/data2/jmena/STL-10'
+# DATA_DIR = '/data/data2/jmena/STL-10'
 DATA_DIR = 'stl10_data'
 
 # url of the binary data
@@ -32,6 +32,10 @@ TEST_LABELS_PATH = DATA_DIR + '/stl10_binary/test_y.bin'
 
 # path to class names file
 CLASS_NAMES_PATH = DATA_DIR + '/stl10_binary/class_names.txt'
+
+# path to the binary unlabeled file with image data
+UNLABELED_DATA_PATH = DATA_DIR + '/stl10_binary/unlabeled_X.bin'
+
 
 class STL10Loader(object):
 
@@ -180,3 +184,17 @@ class STL10Loader(object):
         y_test_cat = to_categorical(y_test, self.num_classes)
 
         return (x_train, y_train, y_train_cat), (x_test, y_test, y_test_cat)
+
+    def load_raw_ood_dataset(self, num_training=500, num_test=500):
+        # download the extract the dataset.
+        self.download_and_extract()
+
+        # load the train and test data and labels.
+        unlabeled = self.read_all_images(UNLABELED_DATA_PATH)
+
+        # convert all images to floats in the range [0, 1]
+        unlabeled = unlabeled.astype('float32')
+        unlabeled = (unlabeled - 10) / 255.0
+        np.random.shuffle(unlabeled)
+
+        return unlabeled[:num_training], unlabeled[num_training:num_test]

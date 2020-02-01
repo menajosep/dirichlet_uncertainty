@@ -173,18 +173,19 @@ if __name__ == "__main__":
     logger.error("Loading STL-10")
     stl10_data_loader = STL10Loader(num_classes)
     (stl10_x_train, stl10_y_train, stl10_y_train_cat), (_, _, _) = stl10_data_loader.load_raw_dataset()
+    stl10_unlabeled_train, _ = stl10_data_loader.load_raw_ood_dataset()
 
     logger.error("Resize training images")
     stl10_x_train_resized = np.array(
         [skimage.transform.resize(image, new_shape, anti_aliasing=True) for image in stl10_x_train])
+    stl10_unlabeled_train_resized = np.array(
+        [skimage.transform.resize(image, new_shape, anti_aliasing=True) for image in stl10_unlabeled_train])
 
-    training_location = stl10_x_train_resized.mean(axis=0)
-    standard_deviation = 2
-    NUMBER_OOD_SAMPLES = 500
-    random_points = np.random.normal(training_location, standard_deviation, (NUMBER_OOD_SAMPLES, 224, 224, 3))
-    stl10_train_X_ood = np.concatenate((stl10_x_train_resized, random_points))
+    stl10_train_X_ood = np.concatenate((stl10_x_train_resized, stl10_unlabeled_train_resized))
+    ood_label = 1/num_classes
+    ood_labels = [ood_label]*num_classes + [0]
     stl10_train_y_ood = np.concatenate(
-        (np.insert(stl10_y_train_cat, num_classes, 1, axis=-1), np.array([[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]] * NUMBER_OOD_SAMPLES)))
+        (np.insert(stl10_y_train_cat, num_classes, 1, axis=-1), np.array([ood_labels] * stl10_unlabeled_train_resized.shape[0])))
 
     logger.error("Load model")
     model = mobilenet_v2.MobileNetV2(weights='imagenet')

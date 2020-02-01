@@ -125,17 +125,20 @@ def get_rejection_measures(prediction, true_label, rejection_heuristic, rejectio
                                         num_total_points - accurately_classified) / accurately_classified))  # phi = ||1-a_R||/||a_r / ||1-a||/||a||
     return non_rejected_accuracy, classification_quality, rejection_quality, rejection_percentage
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="load the job offers from different sources to a common ES index")
     parser.add_argument('--trained_model', type=str, default='unc_model',
-                        help='dir holding the data')
+                        help='trained wrapper')
+    parser.add_argument('--trained_ood_model', type=str, default='unc_ood_model',
+                        help='trained ood wrapper')
     parser.add_argument('--input_dir', type=str, default='/data/data2/jmena/STL-10',
                         help='dir holding the data')
-    parser.add_argument('--mode', type=str, default='categorical',
-                        help='prediction mode: categorical|probabilities|prob_cat')
     parser.add_argument('--output_file', type=str, default='stl10_output',
                         help='file to dump the generated data')
     parser.add_argument('--label_mapping_file', type=str, default='imagenet_stl10_mapping.pkl',
+                        help='label mapping file')
+    parser.add_argument('--inverse_label_mapping_file', type=str, default='stl10_imagenet_mapping.pkl',
                         help='label mapping file')
 
     logger = get_logger()
@@ -143,12 +146,7 @@ if __name__ == "__main__":
     num_classes = 10
     args = parser.parse_args()
     input_dir = args.input_dir
-    if args.mode == 'categorical':
-        test_file = 'test_preds.pkl'
-    elif args.mode == 'probabilities':
-        test_file = 'test_prob_preds.pkl'
-    elif args.mode == 'prob_cat':
-        test_file = 'test_prob_cat_preds.pkl'
+    test_file = 'test_prob_preds.pkl'
     output_file = os.path.sep.join([input_dir, args.output_file])
 
     logger.info('Load mapping file')
@@ -169,10 +167,14 @@ if __name__ == "__main__":
     stl10_data_loader = STL10Loader(num_classes)
     (stl10_x_train, stl10_y_train, stl10_y_train_cat), (
     stl10_x_test, stl10_y_test, stl10_y_test_cat) = stl10_data_loader.load_raw_dataset()
+    _, stl10_unlabeled_test = stl10_data_loader.load_raw_ood_dataset()
 
     logger.error("Resize test images")
     stl10_x_test_resized = np.array(
         [skimage.transform.resize(image, new_shape, anti_aliasing=True) for image in stl10_x_test])
+    stl10_unlabeled_test_resized = np.array(
+        [skimage.transform.resize(image, new_shape, anti_aliasing=True) for image in stl10_unlabeled_test])
+
     logger.error('Load pretrained model')
     unc_model = tf.keras.models.load_model(os.path.sep.join([input_dir, args.trained_model]),
                                            custom_objects={
@@ -181,7 +183,15 @@ if __name__ == "__main__":
                                                'min_beta': min_beta
                                            })
 
+    unc_ood_model = tf.keras.models.load_model(os.path.sep.join([input_dir, args.trained_ood_model]),
+                                           custom_objects={
+                                               'dirichlet_aleatoric_cross_entropy': dirichlet_aleatoric_cross_entropy,
+                                               'max_beta': max_beta,
+                                               'min_beta': min_beta
+                                           })
+
     predictions = unc_model.predict([test_mu_predictions, stl10_x_test_resized])
+    predictions_ood = unc_ood_model.predict([test_mu_predictions, stl10_x_test_resized])
 
     logger.error("Compute uncertainty metrics")
     sess = K.get_session()
@@ -218,11 +228,33 @@ if __name__ == "__main__":
     rejection_measures_ratio_of_confidence = np.array(
         [list(get_rejection_measures(pred_y, stl10_y_test, np.argsort(ratio_of_confidence), rejection_point))
          for rejection_point in range(1, pred_y.shape[0] - 10)])
+
+    logger.error("Compute ood predictions for unlabeled")
+
+    with open(args.inverse_label_mapping_file, 'rb') as file:
+        stl10_imagenet_mapping = pickle.load(file)
+
+    logger.error("Load model")
+    model = mobilenet_v2.MobileNetV2(weights='imagenet')
+    logger.error("Predict training")
+    test_preds = model.predict(stl10_unlabeled_test_resized)
+    test_prob_preds = test_preds[:, stl10_imagenet_mapping[0]].sum(axis=1) / len(stl10_imagenet_mapping[0])
+    for i in range(1, 10):
+        test_prob_preds = np.hstack(
+            (test_prob_preds, test_preds[:, stl10_imagenet_mapping[i]].sum(axis=1) / len(stl10_imagenet_mapping[0])))
+    test_prob_preds = test_prob_preds.reshape((num_classes, test_preds.shape[0])).T
+    test_mu_predictions_ood = test_prob_preds / test_prob_preds.sum(axis=1, keepdims=1)
+
+    predictions_unlabeled = unc_model.predict([test_mu_predictions_ood, stl10_unlabeled_test_resized])
+    predictions_ood_unlabeled = unc_ood_model.predict([test_mu_predictions_ood, stl10_unlabeled_test_resized])
+
     logger.error("Export results")
     with open(output_file, 'wb') as file:
-        pickle.dump((softmax_response, least_confidence, margin_of_confidence, ratio_of_confidence,
+        pickle.dump((predictions, predictions_ood, predictions_unlabeled, predictions_ood_unlabeled,
+                     softmax_response, least_confidence, margin_of_confidence, ratio_of_confidence,
                      mu_entropy, error, voted_pred, sampling_entropy_gal, rejection_measures,
                      rejection_measures_baseline, rejection_measures_voting, rejection_measures_softmax_response,
                      rejection_measures_least_confidence, rejection_measures_margin_of_confidence,
                      rejection_measures_ratio_of_confidence, stl10_y_test), file)
+
     logger.error("Done")

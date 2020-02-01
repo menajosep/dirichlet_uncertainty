@@ -197,4 +197,4 @@ class STL10Loader(object):
         unlabeled = (unlabeled - 10) / 255.0
         np.random.shuffle(unlabeled)
 
-        return unlabeled[:num_training], unlabeled[num_training:num_test]
+        return unlabeled[:num_training], unlabeled[num_training:num_training+num_test]

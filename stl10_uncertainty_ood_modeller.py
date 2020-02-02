@@ -173,7 +173,7 @@ if __name__ == "__main__":
     logger.error("Loading STL-10")
     stl10_data_loader = STL10Loader(num_classes)
     (stl10_x_train, stl10_y_train, stl10_y_train_cat), (_, _, _) = stl10_data_loader.load_raw_dataset()
-    stl10_unlabeled_train, _ = stl10_data_loader.load_raw_ood_dataset()
+    stl10_unlabeled_train, _ = stl10_data_loader.load_raw_ood_dataset(num_training=1000, num_test=1000)
 
     logger.error("Resize training images")
     stl10_x_train_resized = np.array(

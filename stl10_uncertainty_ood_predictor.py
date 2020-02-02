@@ -162,7 +162,7 @@ if __name__ == "__main__":
     stl10_data_loader = STL10Loader(num_classes)
     (stl10_x_train, stl10_y_train, stl10_y_train_cat), (
     stl10_x_test, stl10_y_test, stl10_y_test_cat) = stl10_data_loader.load_raw_dataset()
-    _, stl10_unlabeled_test = stl10_data_loader.load_raw_ood_dataset()
+    _, stl10_unlabeled_test = stl10_data_loader.load_raw_ood_dataset(num_training=1000, num_test=1000)
 
     logger.error("Resize test images")
     stl10_x_test_resized = np.array(

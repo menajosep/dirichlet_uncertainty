@@ -15,6 +15,7 @@ from tensorflow.python.keras.layers import concatenate
 from tensorflow.python.keras.models import Model
 from tensorflow.python.keras.optimizers import Adam
 from tensorflow.python.keras.utils import to_categorical
+from tensorflow.python.keras import backend as K
 
 from stl10_data_loader import STL10Loader
 from tools import get_logger
@@ -23,6 +24,12 @@ epsilon = 1e-10
 lambda_reg = 1e-2
 
 NUM_PREDICITION_SAMPLES = 1000
+
+
+def kullback_leibler_divergence(self, y_true, y_pred):
+    y_true = K.clip(y_true, K.epsilon(), 1)
+    y_pred = K.clip(y_pred, K.epsilon(), 1)
+    return K.sum(y_true * K.log(y_true / y_pred), axis=-1)
 
 
 def dirichlet_aleatoric_cross_entropy(y_true, y_pred):
@@ -68,7 +75,7 @@ def dirichlet_aleatoric_cross_entropy(y_true, y_pred):
     # we return the cross entropy plus a regularization term to prevent the beta
     # to grow forever
     aleatoric_loss = cross_entropy + lambda_reg * tf.reduce_sum(beta, axis=-1)
-    return y_true[:, num_classes:] * aleatoric_loss + (1 - y_true[:, num_classes:]) * tf.reduce_sum(beta, axis=-1)
+    return y_true[:, num_classes:] * aleatoric_loss + (1 - y_true[:, num_classes:]) * kullback_leibler_divergence(y_true[:, :num_classes], e_probs)
 
 
 # metric that outputs the max/min value for the sigma logits

@@ -26,7 +26,7 @@ lambda_reg = 1e-2
 NUM_PREDICITION_SAMPLES = 1000
 
 
-def kullback_leibler_divergence(self, y_true, y_pred):
+def kullback_leibler_divergence(y_true, y_pred):
     y_true = K.clip(y_true, K.epsilon(), 1)
     y_pred = K.clip(y_pred, K.epsilon(), 1)
     return K.sum(y_true * K.log(y_true / y_pred), axis=-1)
